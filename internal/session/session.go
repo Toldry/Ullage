@@ -119,15 +119,16 @@ type Manager struct {
 	environment Environment
 	library     *recipes.Library
 
-	lock      sync.Mutex
-	config    storage.Config
-	firstRun  bool
-	state     State
-	failure   string
-	current   *running
-	completed *Completed
-	log       *eventLog
-	redaction redactionState
+	lock        sync.Mutex
+	config      storage.Config
+	firstRun    bool
+	state       State
+	failure     string
+	current     *running
+	completed   *Completed
+	log         *eventLog
+	redaction   redactionState
+	exportState exportState
 }
 
 // NewManager loads the recipe library and saved config.

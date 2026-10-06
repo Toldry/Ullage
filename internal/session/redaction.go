@@ -22,6 +22,8 @@ type redactionState struct {
 	overrides map[scanner.NodeIndex]redact.Override
 	// redactor is rebuilt lazily after any rule or override change.
 	redactor *redact.Redactor
+	// version counts redaction changes, so an export can tell it is out of date.
+	version int
 }
 
 // ErrRulesUnavailable is returned by every redaction operation while the rules file
@@ -44,7 +46,15 @@ func (manager *Manager) loadRules() {
 
 func (manager *Manager) resetRedactionForNewScan() {
 	manager.redaction.overrides = map[scanner.NodeIndex]redact.Override{}
+	manager.invalidateRedaction()
+	// A new scan has new items, so prompts and replies of the old one no longer apply.
+	manager.exportState = exportState{}
+}
+
+// invalidateRedaction drops the cached redactor after rules or choices change.
+func (manager *Manager) invalidateRedaction() {
 	manager.redaction.redactor = nil
+	manager.redaction.version++
 }
 
 func (manager *Manager) redactionContext() redact.Context {
@@ -407,7 +417,7 @@ func (manager *Manager) SetOverride(request OverrideRequest) error {
 	default:
 		return errors.New("treatment must be subtree, keep-extension, none or default")
 	}
-	manager.redaction.redactor = nil
+	manager.invalidateRedaction()
 	return nil
 }
 
@@ -561,7 +571,7 @@ func (manager *Manager) commitRules(rules []redact.Rule) error {
 		manager.redaction.document.Rules = previous
 		return err
 	}
-	manager.redaction.redactor = nil
+	manager.invalidateRedaction()
 	return nil
 }
 

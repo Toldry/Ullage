@@ -104,30 +104,39 @@ func (server *Server) touch() { server.lastActivity.Store(time.Now().UnixNano())
 type route struct {
 	method  string
 	handler func(http.ResponseWriter, *http.Request)
+	// maximumBodyBytes overrides the default request size limit.
+	maximumBodyBytes int64
 }
+
+// maximumPasteBytes allows a reply for a full batch with generous slack.
+const maximumPasteBytes = 4 << 20
 
 func (server *Server) apiRoutes() map[string]route {
 	return map[string]route{
-		"/api/status":             {http.MethodGet, server.handleStatus},
-		"/api/volumes":            {http.MethodGet, server.handleVolumes},
-		"/api/scan/progress":      {http.MethodGet, server.handleProgress},
-		"/api/overview":           {http.MethodGet, server.handleOverview},
-		"/api/scan":               {http.MethodPost, server.handleStartScan},
-		"/api/scan/pause":         {http.MethodPost, server.handleScanControl},
-		"/api/scan/resume":        {http.MethodPost, server.handleScanControl},
-		"/api/scan/cancel":        {http.MethodPost, server.handleScanControl},
-		"/api/config":             {http.MethodPost, server.handleConfig},
-		"/api/heartbeat":          {http.MethodPost, server.handleHeartbeat},
-		"/api/relaunch-elevated":  {http.MethodPost, server.handleRelaunch},
-		"/api/quit":               {http.MethodPost, server.handleQuit},
-		"/api/redaction/summary":  {http.MethodGet, server.handleRedactionSummary},
-		"/api/redaction/children": {http.MethodGet, server.handleRedactionChildren},
-		"/api/redaction/item":     {http.MethodGet, server.handleRedactionItem},
-		"/api/redaction/override": {http.MethodPost, server.handleRedactionOverride},
-		"/api/rules":              {http.MethodGet, server.handleRules},
-		"/api/rules/save":         {http.MethodPost, server.handleSaveRule},
-		"/api/rules/delete":       {http.MethodPost, server.handleDeleteRule},
-		"/api/rules/reset":        {http.MethodPost, server.handleResetRules},
+		"/api/status":             {method: http.MethodGet, handler: server.handleStatus},
+		"/api/volumes":            {method: http.MethodGet, handler: server.handleVolumes},
+		"/api/scan/progress":      {method: http.MethodGet, handler: server.handleProgress},
+		"/api/overview":           {method: http.MethodGet, handler: server.handleOverview},
+		"/api/scan":               {method: http.MethodPost, handler: server.handleStartScan},
+		"/api/scan/pause":         {method: http.MethodPost, handler: server.handleScanControl},
+		"/api/scan/resume":        {method: http.MethodPost, handler: server.handleScanControl},
+		"/api/scan/cancel":        {method: http.MethodPost, handler: server.handleScanControl},
+		"/api/config":             {method: http.MethodPost, handler: server.handleConfig},
+		"/api/heartbeat":          {method: http.MethodPost, handler: server.handleHeartbeat},
+		"/api/relaunch-elevated":  {method: http.MethodPost, handler: server.handleRelaunch},
+		"/api/quit":               {method: http.MethodPost, handler: server.handleQuit},
+		"/api/redaction/summary":  {method: http.MethodGet, handler: server.handleRedactionSummary},
+		"/api/redaction/children": {method: http.MethodGet, handler: server.handleRedactionChildren},
+		"/api/redaction/item":     {method: http.MethodGet, handler: server.handleRedactionItem},
+		"/api/redaction/override": {method: http.MethodPost, handler: server.handleRedactionOverride},
+		"/api/rules":              {method: http.MethodGet, handler: server.handleRules},
+		"/api/rules/save":         {method: http.MethodPost, handler: server.handleSaveRule},
+		"/api/rules/delete":       {method: http.MethodPost, handler: server.handleDeleteRule},
+		"/api/rules/reset":        {method: http.MethodPost, handler: server.handleResetRules},
+		"/api/export":             {method: http.MethodGet, handler: server.handleExport},
+		"/api/export/rebuild":     {method: http.MethodPost, handler: server.handleRebuildExport},
+		"/api/paste": {method: http.MethodPost, handler: server.handlePaste,
+			maximumBodyBytes: maximumPasteBytes},
 	}
 }
 
@@ -203,7 +212,11 @@ func (server *Server) handleAPI(writer http.ResponseWriter, request *http.Reques
 	if !server.requireSession(writer, request, true) {
 		return
 	}
-	request.Body = http.MaxBytesReader(writer, request.Body, maximumRequestBytes)
+	limit := int64(maximumRequestBytes)
+	if selected.maximumBodyBytes > 0 {
+		limit = selected.maximumBodyBytes
+	}
+	request.Body = http.MaxBytesReader(writer, request.Body, limit)
 	selected.handler(writer, request)
 }
 

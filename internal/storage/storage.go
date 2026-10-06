@@ -14,6 +14,10 @@ type Config struct {
 	Theme                string   `json:"theme"`
 	IncludeOtherProfiles bool     `json:"includeOtherProfiles"`
 	Exclusions           []string `json:"exclusions"`
+	// Prompt tuning; zero means the built-in default.
+	PromptMinimumMegabytes int `json:"promptMinimumMegabytes,omitempty"`
+	PromptBatchLines       int `json:"promptBatchLines,omitempty"`
+	PromptMaximumItems     int `json:"promptMaximumItems,omitempty"`
 }
 
 const configFileName = "config.json"
