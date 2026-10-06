@@ -152,7 +152,8 @@ func TestWrongOriginIsRejected(t *testing.T) {
 func TestStateChangingEndpointsRejectGetAndQueryTokens(t *testing.T) {
 	server := newTestServer(t)
 	for _, path := range []string{"/api/scan", "/api/scan/cancel", "/api/config",
-		"/api/quit", "/api/relaunch-elevated"} {
+		"/api/quit", "/api/relaunch-elevated", "/api/redaction/override", "/api/rules/save",
+		"/api/rules/delete", "/api/rules/reset"} {
 		response := server.do(requestOptions{path: path, token: server.guard.apiToken})
 		if response.Code != http.StatusMethodNotAllowed {
 			t.Errorf("GET %s: status %d", path, response.Code)
@@ -210,5 +211,22 @@ func TestListensOnLoopbackOnly(t *testing.T) {
 	response.Body.Close()
 	if response.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("unauthenticated request: %d", response.StatusCode)
+	}
+}
+
+func TestRulesResetNeedsExplicitConfirmation(t *testing.T) {
+	server := newTestServer(t)
+	for _, body := range []string{`{}`, `{"confirm":"yes"}`, `{"confirm":"RESET"}`} {
+		response := server.do(requestOptions{method: http.MethodPost, path: "/api/rules/reset",
+			token: server.guard.apiToken, origin: server.guard.expectedOrigin, body: body})
+		if response.Code != http.StatusBadRequest {
+			t.Errorf("body %s: status %d", body, response.Code)
+		}
+	}
+	summary := server.do(requestOptions{path: "/api/redaction/summary",
+		token: server.guard.apiToken})
+	if summary.Code != http.StatusOK || !strings.Contains(summary.Body.String(),
+		`"available":true`) {
+		t.Errorf("summary: %d %s", summary.Code, summary.Body)
 	}
 }

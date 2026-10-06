@@ -108,18 +108,26 @@ type route struct {
 
 func (server *Server) apiRoutes() map[string]route {
 	return map[string]route{
-		"/api/status":            {http.MethodGet, server.handleStatus},
-		"/api/volumes":           {http.MethodGet, server.handleVolumes},
-		"/api/scan/progress":     {http.MethodGet, server.handleProgress},
-		"/api/overview":          {http.MethodGet, server.handleOverview},
-		"/api/scan":              {http.MethodPost, server.handleStartScan},
-		"/api/scan/pause":        {http.MethodPost, server.handleScanControl},
-		"/api/scan/resume":       {http.MethodPost, server.handleScanControl},
-		"/api/scan/cancel":       {http.MethodPost, server.handleScanControl},
-		"/api/config":            {http.MethodPost, server.handleConfig},
-		"/api/heartbeat":         {http.MethodPost, server.handleHeartbeat},
-		"/api/relaunch-elevated": {http.MethodPost, server.handleRelaunch},
-		"/api/quit":              {http.MethodPost, server.handleQuit},
+		"/api/status":             {http.MethodGet, server.handleStatus},
+		"/api/volumes":            {http.MethodGet, server.handleVolumes},
+		"/api/scan/progress":      {http.MethodGet, server.handleProgress},
+		"/api/overview":           {http.MethodGet, server.handleOverview},
+		"/api/scan":               {http.MethodPost, server.handleStartScan},
+		"/api/scan/pause":         {http.MethodPost, server.handleScanControl},
+		"/api/scan/resume":        {http.MethodPost, server.handleScanControl},
+		"/api/scan/cancel":        {http.MethodPost, server.handleScanControl},
+		"/api/config":             {http.MethodPost, server.handleConfig},
+		"/api/heartbeat":          {http.MethodPost, server.handleHeartbeat},
+		"/api/relaunch-elevated":  {http.MethodPost, server.handleRelaunch},
+		"/api/quit":               {http.MethodPost, server.handleQuit},
+		"/api/redaction/summary":  {http.MethodGet, server.handleRedactionSummary},
+		"/api/redaction/children": {http.MethodGet, server.handleRedactionChildren},
+		"/api/redaction/item":     {http.MethodGet, server.handleRedactionItem},
+		"/api/redaction/override": {http.MethodPost, server.handleRedactionOverride},
+		"/api/rules":              {http.MethodGet, server.handleRules},
+		"/api/rules/save":         {http.MethodPost, server.handleSaveRule},
+		"/api/rules/delete":       {http.MethodPost, server.handleDeleteRule},
+		"/api/rules/reset":        {http.MethodPost, server.handleResetRules},
 	}
 }
 

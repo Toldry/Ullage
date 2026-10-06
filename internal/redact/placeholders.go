@@ -65,6 +65,13 @@ func (registry *Registry) Lookup(number int) (string, bool) {
 	return "", false
 }
 
+// Dirty reports whether numbers were allocated since the last snapshot.
+func (registry *Registry) Dirty() bool {
+	registry.lock.Lock()
+	defer registry.lock.Unlock()
+	return registry.changed
+}
+
 // Snapshot returns the state to persist and whether it changed since the last snapshot.
 func (registry *Registry) Snapshot() (map[string]int, int, bool) {
 	registry.lock.Lock()

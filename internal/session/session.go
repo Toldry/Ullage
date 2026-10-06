@@ -14,6 +14,7 @@ import (
 
 	"github.com/toldry/ullage/internal/overview"
 	"github.com/toldry/ullage/internal/platform"
+	"github.com/toldry/ullage/internal/protect"
 	"github.com/toldry/ullage/internal/recipes"
 	"github.com/toldry/ullage/internal/scanner"
 	"github.com/toldry/ullage/internal/storage"
@@ -43,6 +44,10 @@ type Environment struct {
 	InstalledApplications func() ([]platform.InstalledApplication, error)
 	BeginBackgroundMode   func() func()
 	ConfigDirectory       string
+	// Protector encrypts the redaction rules file.
+	Protector protect.Protector
+	// SensitiveWords are always redacted: account names and the machine name.
+	SensitiveWords []string
 }
 
 // NativeEnvironment wires the real platform implementation.
@@ -57,7 +62,38 @@ func NativeEnvironment(configDirectory string) Environment {
 		InstalledApplications: platform.InstalledApplications,
 		BeginBackgroundMode:   platform.BeginBackgroundMode,
 		ConfigDirectory:       configDirectory,
+		Protector:             protect.Native(configDirectory),
+		SensitiveWords:        sensitiveWords(platform.DiscoverKnownLocations()),
 	}
+}
+
+// sensitiveWords collects every local account name (from profile folders, which include
+// other users) plus the current user name and the machine name.
+func sensitiveWords(locations platform.KnownLocations) []string {
+	words := []string{platform.UserName(), platform.MachineName()}
+	for _, profile := range locations.Variables["UserProfile"] {
+		if name := filepath.Base(profile); !isSharedProfile(name) {
+			words = append(words, name)
+		}
+	}
+	unique := []string{}
+	seen := map[string]bool{}
+	for _, word := range words {
+		key := strings.ToLower(strings.TrimSpace(word))
+		if key != "" && !seen[key] {
+			seen[key] = true
+			unique = append(unique, strings.TrimSpace(word))
+		}
+	}
+	return unique
+}
+
+func isSharedProfile(name string) bool {
+	switch strings.ToLower(name) {
+	case "public", "default", "default user", "all users":
+		return true
+	}
+	return false
 }
 
 // Completed is a finished scan and everything derived from it.
@@ -91,6 +127,7 @@ type Manager struct {
 	current   *running
 	completed *Completed
 	log       *eventLog
+	redaction redactionState
 }
 
 // NewManager loads the recipe library and saved config.
@@ -103,9 +140,11 @@ func NewManager(environment Environment) (*Manager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}
-	return &Manager{environment: environment, library: library, config: config,
+	manager := &Manager{environment: environment, library: library, config: config,
 		firstRun: !storage.ConfigExists(environment.ConfigDirectory), state: StateIdle,
-		log: newEventLog(400)}, nil
+		log: newEventLog(400)}
+	manager.loadRules()
+	return manager, nil
 }
 
 // Config returns the current preferences.
@@ -263,10 +302,7 @@ func (manager *Manager) exclusionPredicate(request ScanRequest) func(string) boo
 	if !request.IncludeOtherProfiles {
 		current := manager.CurrentProfile()
 		for _, profile := range locations.Variables["UserProfile"] {
-			name := strings.ToLower(filepath.Base(profile))
-			shared := name == "public" || name == "default" || name == "default user" ||
-				name == "all users"
-			if !shared && !strings.EqualFold(profile, current) {
+			if !isSharedProfile(filepath.Base(profile)) && !strings.EqualFold(profile, current) {
 				otherProfiles[normalizeKey(profile, locations.CaseInsensitive)] = true
 			}
 		}
@@ -314,6 +350,7 @@ func (manager *Manager) awaitScan(current *running, restorePriority func()) {
 			}),
 		}
 		manager.state = StateFinished
+		manager.resetRedactionForNewScan()
 	}
 }
 

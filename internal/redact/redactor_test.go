@@ -2,8 +2,8 @@ package redact
 
 import (
 	"path/filepath"
-	"strconv"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
