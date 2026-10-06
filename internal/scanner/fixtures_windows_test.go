@@ -50,7 +50,7 @@ func TestFixtureSparseFileUsesAllocatedSize(t *testing.T) {
 	if err := os.Truncate(sparsePath, 1<<30); err != nil {
 		t.Fatal(err)
 	}
-	result := scanDirectory(t, root)
+	result := scanRetainingEveryFile(t, root)
 	node := findNode(t, result, sparsePath)
 	if node.Attributes&platform.AttributeSparse == 0 {
 		t.Fatalf("sparse attribute not detected")
@@ -70,10 +70,19 @@ func TestFixtureCompressedFileUsesCompressedSize(t *testing.T) {
 	format := uint16(compressionDefault)
 	deviceControl(t, compressedPath, controlSetCompression,
 		unsafe.Slice((*byte)(unsafe.Pointer(&format)), 2))
-	if err := os.WriteFile(compressedPath, make([]byte, 8<<20), 0o644); err != nil {
+	// NTFS reserves full clusters for compressed data until the cache is flushed.
+	compressedFile, err := os.OpenFile(compressedPath, os.O_WRONLY, 0)
+	if err != nil {
 		t.Fatal(err)
 	}
-	result := scanDirectory(t, root)
+	if _, err := compressedFile.Write(make([]byte, 8<<20)); err != nil {
+		t.Fatal(err)
+	}
+	if err := compressedFile.Sync(); err != nil {
+		t.Fatal(err)
+	}
+	compressedFile.Close()
+	result := scanRetainingEveryFile(t, root)
 	node := findNode(t, result, compressedPath)
 	if node.Attributes&platform.AttributeCompressed == 0 {
 		t.Fatalf("compressed attribute not detected")

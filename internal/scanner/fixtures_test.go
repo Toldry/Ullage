@@ -17,6 +17,14 @@ func scanDirectory(t *testing.T, root string) *Result {
 		Workers: 4})
 }
 
+// scanRetainingEveryFile keeps files of any size as nodes, so tests can inspect files
+// that occupy almost nothing on disk (sparse or compressed).
+func scanRetainingEveryFile(t *testing.T, root string) *Result {
+	t.Helper()
+	return runScan(t, Options{Roots: []string{root}, Reader: platform.NewDirectoryReader(),
+		Workers: 4, RetainFileBytes: 1})
+}
+
 func writeFile(t *testing.T, path string, size int) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
