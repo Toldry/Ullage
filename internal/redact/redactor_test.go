@@ -72,16 +72,24 @@ func TestAlwaysOnRedactions(t *testing.T) {
 			t.Errorf("Render(%s) = %s, want %s", path, got, want)
 		}
 	}
-	redactedNames := map[string]string{
-		"/data/Users/mara/Documents/mara-notes.pdf":                             `^/data/Users/~/Documents/<R\d+>\.pdf$`,
-		"/data/Users/mara/Documents/maraBudget.xlsx":                            `^/data/Users/~/Documents/<R\d+>\.xlsx$`,
-		"/data/Users/bob/Desktop/x.bin":                                         `^/data/Users/<R\d+>/Desktop/x\.bin$`,
-		"/data/Users/mara/AppData/Local/al-notes/x.bin":                         `^/data/Users/~/AppData/Local/<R\d+>/x\.bin$`,
-		"/data/Backups/DESKTOP-ZX81-image/disk.vhdx":                            `^/data/Backups/<R\d+>/disk\.vhdx$`,
-		"/data/$Recycle.Bin/S-1-5-21-3623811015-3361044348-30300820-1013/x.bin": `^/data/\$Recycle\.Bin/<R\d+>/x\.bin$`,
-		"/data/Users/mara/odd/x.mara":                                           `^/data/Users/~/odd/<R\d+>$`,
+	redactedNames := []struct{ path, pattern string }{
+		{"/data/Users/mara/Documents/mara-notes.pdf",
+			`^/data/Users/~/Documents/<R\d+>\.pdf$`},
+		{"/data/Users/mara/Documents/maraBudget.xlsx",
+			`^/data/Users/~/Documents/<R\d+>\.xlsx$`},
+		{"/data/Users/bob/Desktop/x.bin",
+			`^/data/Users/<R\d+>/Desktop/x\.bin$`},
+		{"/data/Users/mara/AppData/Local/al-notes/x.bin",
+			`^/data/Users/~/AppData/Local/<R\d+>/x\.bin$`},
+		{"/data/Backups/DESKTOP-ZX81-image/disk.vhdx",
+			`^/data/Backups/<R\d+>/disk\.vhdx$`},
+		{"/data/$Recycle.Bin/S-1-5-21-3623811015-3361044348-30300820-1013/x.bin",
+			`^/data/\$Recycle\.Bin/<R\d+>/x\.bin$`},
+		{"/data/Users/mara/odd/x.mara",
+			`^/data/Users/~/odd/<R\d+>$`},
 	}
-	for path, pattern := range redactedNames {
+	for _, entry := range redactedNames {
+		path, pattern := entry.path, entry.pattern
 		if got := fixture.render(t, redactor, path); !regexp.MustCompile(pattern).MatchString(got) {
 			t.Errorf("Render(%s) = %s, want match %s", path, got, pattern)
 		}
@@ -137,14 +145,20 @@ func TestNameGlobAndSubtreeKeepExtensionRules(t *testing.T) {
 			Treatment: TreatmentKeepExtension},
 	}
 	redactor := fixture.redactor(rules, nil)
-	expectations := map[string]string{
-		"/data/Users/mara/Downloads/2025-tax-return.pdf":     `^/data/Users/~/Downloads/<R\d+>\.pdf$`,
-		"/data/Users/mara/Desktop/TAX notes.txt":             `^/data/Users/~/Desktop/<R\d+>\.txt$`,
-		"/data/Users/mara/clients/northwind/contract.docx":   `^/data/Users/~/clients/<R\d+>/<R\d+>$`,
-		"/data/Users/mara/legal/case-114/brief.docx":         `^/data/Users/~/legal/<R\d+>/<R\d+>\.docx$`,
-		"/data/Users/mara/legal/case-114/exhibits/photo.jpg": `^/data/Users/~/legal/<R\d+>/<R\d+>/<R\d+>\.jpg$`,
+	expectations := []struct{ path, pattern string }{
+		{"/data/Users/mara/Downloads/2025-tax-return.pdf",
+			`^/data/Users/~/Downloads/<R\d+>\.pdf$`},
+		{"/data/Users/mara/Desktop/TAX notes.txt",
+			`^/data/Users/~/Desktop/<R\d+>\.txt$`},
+		{"/data/Users/mara/clients/northwind/contract.docx",
+			`^/data/Users/~/clients/<R\d+>/<R\d+>$`},
+		{"/data/Users/mara/legal/case-114/brief.docx",
+			`^/data/Users/~/legal/<R\d+>/<R\d+>\.docx$`},
+		{"/data/Users/mara/legal/case-114/exhibits/photo.jpg",
+			`^/data/Users/~/legal/<R\d+>/<R\d+>/<R\d+>\.jpg$`},
 	}
-	for path, pattern := range expectations {
+	for _, entry := range expectations {
+		path, pattern := entry.path, entry.pattern
 		if got := fixture.render(t, redactor, path); !regexp.MustCompile(pattern).MatchString(got) {
 			t.Errorf("Render(%s) = %s, want match %s", path, got, pattern)
 		}

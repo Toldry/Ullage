@@ -4,6 +4,8 @@ import { api, ApiError, SessionExpiredError } from './lib/api';
 import { formatBytes } from './lib/format';
 import type { Config, LogLine, Overview, Progress, Status, Volume } from './lib/types';
 import { OverviewScreen } from './screens/OverviewScreen';
+import { RedactScreen } from './screens/RedactScreen';
+import { RulesScreen } from './screens/RulesScreen';
 import { ScanningScreen } from './screens/ScanningScreen';
 import { ScanScreen, type ScanSelection } from './screens/ScanScreen';
 
@@ -126,12 +128,15 @@ export function App() {
     if (result) setError('Relaunching as administrator. A new tab will open; close this one.');
   }, [guard]);
 
-  const reachedStep = overview ? 2 : 1;
+  const reachedStep = overview ? 3 : 1;
 
   const navigate = useCallback((target: Screen) => {
     if (target === 'scan' && screen === 'scanning') return;
-    if (target === 'overview' && !overview) return;
-    if (target === 'scan' || target === 'overview') setScreen(target);
+    if ((target === 'overview' || target === 'redact') && !overview) return;
+    if (target === 'scan' || target === 'overview' || target === 'redact' ||
+      target === 'rules') {
+      setScreen(target);
+    }
   }, [screen, overview]);
 
   const startFromKeyboard = useCallback(() => {
@@ -148,6 +153,8 @@ export function App() {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key === '1') navigate('scan');
     else if (event.key === '2') navigate('overview');
+    else if (event.key === '3') navigate('redact');
+    else if (event.key === 'r' || event.key === 'R') navigate('rules');
     else if (event.key === 't' || event.key === 'T') toggleTheme();
     else if (event.key === 'Enter' && screen === 'scan' && target.tagName !== 'BUTTON') {
       event.preventDefault();
@@ -249,8 +256,13 @@ export function App() {
               canRelaunch={status.canRelaunch}
               onRescan={() => { setError(''); setScreen('scan'); }}
               onRelaunch={relaunch}
+              onReview={() => setScreen('redact')}
             />
           )}
+          {screen === 'redact' && (
+            <RedactScreen guard={guard} onOpenRules={() => setScreen('rules')} />
+          )}
+          {screen === 'rules' && <RulesScreen guard={guard} />}
         </Main>
       </div>
       <StatusBar

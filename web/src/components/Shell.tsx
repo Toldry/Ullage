@@ -103,18 +103,25 @@ export function Sidebar(props: {
       {[
         { screen: 'rules' as Screen, key: 'R', label: 'Redaction rules' },
         { screen: 'history' as Screen, key: 'H', label: 'History' },
-      ].map((item) => (
-        <button
-          type="button"
-          key={item.screen}
-          class={`nav-item${props.active === item.screen ? ' active' : ''}`}
-          disabled
-          title="Arrives in a later phase"
-        >
-          <span class="nav-number">{item.key}</span>
-          <span class="nav-label">{item.label}</span>
-        </button>
-      ))}
+      ].map((item) => {
+        // History arrives in Phase 6; until then only the rules library is available.
+        const available = item.screen === 'rules';
+        return (
+          <button
+            type="button"
+            key={item.screen}
+            class={`nav-item${available ? ' reached' : ''}` +
+              `${props.active === item.screen ? ' active' : ''}`}
+            disabled={!available}
+            title={available ? undefined : 'Arrives in a later phase'}
+            onClick={() => props.onNavigate(item.screen)}
+          >
+            <span class="nav-number">{item.key}</span>
+            <span class="nav-label">{item.label}</span>
+            <span class="nav-meta">{props.meta[item.screen] ?? ''}</span>
+          </button>
+        );
+      })}
       <div class="spacer" />
       <div class="sidebar-footer">
         <div>127.0.0.1:{props.port}</div>
@@ -142,7 +149,7 @@ export function StatusBar(props: {
       {props.files !== undefined && <span>{formatCount(props.files)} files indexed</span>}
       <span>{props.elevated ? 'elevated' : 'not elevated'}</span>
       <div class="spacer" />
-      <span>1–2 steps · Enter start · Esc cancel · T theme</span>
+      <span>1–3 steps · R rules · Enter start · Esc cancel · T theme</span>
     </footer>
   );
 }

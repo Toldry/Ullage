@@ -57,8 +57,10 @@ func TestUnreadableStoreFailsClosed(t *testing.T) {
 	}
 	original, _ := os.ReadFile(StorePath(directory))
 
+	tampered := append([]byte{}, original...)
+	tampered[len(tampered)-1] ^= 1
 	corruptions := map[string][]byte{
-		"tampered":    append(append([]byte{}, original[:len(original)-1]...), original[len(original)-1]^1),
+		"tampered":    tampered,
 		"wrong magic": append([]byte("NOT-ULLAGE\x00"), original[len(storeMagic):]...),
 		"empty":       {},
 		"truncated":   original[:len(storeMagic)+3],

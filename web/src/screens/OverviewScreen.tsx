@@ -14,6 +14,7 @@ interface Props {
   canRelaunch: boolean;
   onRescan: () => void;
   onRelaunch: () => void;
+  onReview: () => void;
 }
 
 const tierLabels: Record<TierName, string> = {
@@ -23,7 +24,8 @@ const tierLabels: Record<TierName, string> = {
   unaccounted: 'Unaccounted',
 };
 
-export function OverviewScreen({ overview, canRelaunch, onRescan, onRelaunch }: Props) {
+export function OverviewScreen(
+  { overview, canRelaunch, onRescan, onRelaunch, onReview }: Props) {
   const totals = overview.totals;
   const rootNames = overview.roots.map((root) => root.display).join(' ');
   const partialBanner = overview.partial && (totals.unaccounted > 0 || overview.deniedCount > 0);
@@ -44,8 +46,7 @@ export function OverviewScreen({ overview, canRelaunch, onRescan, onRelaunch }: 
           <button
             type="button"
             class="button button-primary button-with-key"
-            disabled
-            title="Redaction review arrives in Phase 2"
+            onClick={onReview}
           >
             Review unknown items
             <Kbd inverse>3</Kbd>

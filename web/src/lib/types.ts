@@ -120,3 +120,77 @@ export interface Overview {
   notLocalBytes: number;
   links: number;
 }
+
+// Redaction (internal/session/redaction.go)
+export type RedactionDecision = 'visible' | 'home' | 'hidden' | 'subtree' | 'keep-extension';
+export type RedactionSource = '' | 'rule' | 'session' | 'always' | 'same-name' | 'ancestor';
+
+export interface RedactionSummary {
+  available: boolean;
+  error?: string;
+  storePath: string;
+  sessionCode: string;
+  rules: number;
+  unknownItems: number;
+  redacted: number;
+  byRules: number;
+  bySession: number;
+  alwaysRedacted: number;
+}
+
+export interface RedactionItem {
+  id: number;
+  name: string;
+  path: string;
+  kind: 'folder' | 'file' | 'link';
+  bytes: number;
+  files: number;
+  hasChildren: boolean;
+  decision: RedactionDecision;
+  source: RedactionSource;
+  ruleId?: string;
+  rulePattern?: string;
+  rendered: string;
+  keepWellKnown: boolean;
+}
+
+export interface RedactionChildren {
+  sessionCode: string;
+  items: RedactionItem[];
+  moreCount: number;
+  moreBytes: number;
+  filesBytes: number;
+  filesCount: number;
+}
+
+export interface RedactionDetail {
+  item: RedactionItem;
+  preview: RedactionItem[];
+}
+
+export type RuleType = 'exact' | 'subtree' | 'glob' | 'name';
+export type RuleTreatment = 'subtree' | 'keep-extension';
+
+export interface RuleView {
+  id: string;
+  type: RuleType;
+  pattern: string;
+  treatment: RuleTreatment;
+  keepWellKnown: boolean;
+  created: string;
+  lastMatched?: string;
+  matches: number;
+  matchBytes: number;
+  hits: string[];
+  inScan: boolean;
+}
+
+export interface RuleDraft {
+  id?: string;
+  type: RuleType;
+  pattern?: string;
+  treatment: RuleTreatment;
+  keepWellKnown: boolean;
+  sessionCode?: string;
+  fromNode?: number;
+}
