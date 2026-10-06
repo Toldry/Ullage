@@ -234,7 +234,7 @@ rejected as a session mismatch instead of being mapped onto different items. Aft
 import, a redaction change marks the export stale; the import is kept until the user
 rebuilds explicitly.
 
-### D-039: What the parser tolerates — Reported (Phase 3)
+### D-039: What the parser tolerates — Approved (Phase 3 review: no synonyms)
 Tolerated: prose around the block, fences, bold markers, Markdown tables, bullets,
 blockquotes, smart quotes, typographic dashes in ranges, zero-width and non-breaking
 characters, CRLF, upper-case enums and headers, and the prompt pasted before the reply
@@ -256,3 +256,66 @@ under the same re-verification as every other item. To be designed in Phase 5.
 The UI shows characters / 4. `tools/tokenestimate` (dev only) counts letter runs, digit
 runs and symbols; expect ±30%. A typical mixed PC (320 GB Unknown) produced 108 items in
 39 lines, about 1,300 tokens including instructions.
+
+## Results and round B (Phase 4)
+
+### D-043: What the Results list contains — Reported (Phase 4)
+- Recipe categories: one per recipe, summing the Known bytes of every place its claims
+  start. Bytes of a nested claim (a recipe path inside another recipe's) count only for
+  the nested one. Installed applications are left out (their recipe says keep), and so
+  is any category under the prompt's minimum item size (default 100 MiB).
+- AI categories: one per imported row, with the export items its IDs name. Rows marked
+  `del 0` are not reclaimable: they are listed under "the AI suggests keeping", shown on
+  request, and cannot be selected.
+- Both are sorted by bytes, largest first. A summary accounts for System, Known that
+  recipes keep, Unknown kept by the AI and Unknown not classified, so an empty result
+  still explains where the space is.
+
+### D-044: Numbering and rounds for round B — Reported (Phase 4)
+Every imported category gets a number unique within the export, assigned at import.
+Round B refers to categories only by these numbers. Importing a batch again gives its
+categories new numbers and drops their explanations, queue entries and unlocks. The
+round B prompt uses the export's session code and is the step after the batches (round
+4 after three batches, round 5 after the next explanation round), as in the design.
+
+### D-045: What the round B parser tolerates — Reported (Phase 4)
+Same extraction as round A (prose, fences, quotes, last block). Accepted: bullets, bold
+markers, `### #2` headings, `Step 1:` and upper-case keys. Required per category:
+exactly one `what:`, one `lost:` and 1 to 5 `step:` lines. The prompt asks for under 25
+words per line; above 40 words or 320 characters the reply goes back for repair.
+Numbers that were not asked about, and duplicates, are rejected. Requested categories
+the reply leaves out are not an error: they stay queued. Control and format characters
+are removed from the text, which is only ever displayed.
+
+### D-046: AI cleanup steps are text, not commands — Reported (Phase 4)
+The design shows AI categories with copyable `$ command` lines. A command written by the
+assistant is an action it authored (safety rule 3), and a copy button would present it
+with the program's endorsement. AI steps are shown as plain advice, labeled "advice from
+the AI"; only recipe steps, which ship with Ullage, have command lines with a copy
+button. See design conflict 15.
+
+### D-047: How real names are restored — Reported (Phase 4)
+Placeholders in category names and explanations are replaced locally using only the
+placeholders of items in the current export and their folders, rendered by the same
+redactor the prompt was built with. A placeholder the export never used stays as it is.
+The round B prompt always uses the assistant's original text, never the restored one;
+a test asserts that no redacted name reaches it.
+
+### D-048: The low-confidence unlock is recorded by the server — Reported (Phase 4)
+Opening a low-confidence row posts `/api/results/expand`; the server records it and only
+then reports the category as selectable. Phase 5 can therefore refuse a deletion of a
+low-confidence category nobody opened, not only hide the checkbox.
+
+### D-049: Selection lives in the browser until Phase 5 — Reported (Phase 4)
+Checkboxes select items (or a whole category, including items beyond the 200 listed).
+The selection is kept in the page and pruned when results change; "Review deletion" is
+disabled until step 7 exists. Phase 5 will send the selected keys and re-resolve every
+one on the server.
+
+### D-050: AI categories without an explanation stay selectable — Needs review (Phase 4)
+The design says "Cleanup methods arrive with the explanation. Until then these items
+can't be selected." The spec makes explanations lazy and gates only low confidence.
+Following the spec, a `del 1` category can be selected without an explanation; its row
+offers "Request explanation". Requiring an explanation before any AI deletion would be
+the stricter choice, at the cost of a round B for every category. See design conflict
+16.

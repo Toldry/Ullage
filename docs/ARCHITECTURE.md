@@ -127,12 +127,13 @@ ullage/
 │   ├── redact/              redaction rules, placeholders, path rendering
 │   ├── prompt/              Unknown tier → numbered, redacted, batched prompt text
 │   ├── response/            tolerant reply extraction, strict validation, repair prompts
-│   ├── session/             per-launch state: scan, session code, log, redaction, export
+│   ├── results/             recipe + AI categories merged, names restored for display
+│   ├── session/             per-launch state: scan, code, log, redaction, export, results
 │   ├── server/              HTTP handlers, token/Host/Origin guard, SSE progress
 │   ├── storage/             config file, atomic writes
 │   └── nonetwork/           runtime guard that disables outbound HTTP and DNS
 │   ├── scanner/scannertest/ in-memory file system for tests
-│   (later phases add results/, deletion/, history/)
+│   (later phases add deletion/, history/)
 ├── web/                     Preact + TypeScript UI; dist/ is embedded by package web
 ├── tools/nonetwork/         build check: forbids outbound network APIs (see §6)
 ├── tools/tokenestimate/     DEV ONLY: token estimate for prompts of a sample scan
@@ -195,8 +196,12 @@ Step by step:
    process (and in the encrypted rules file).
 5. **Paste.** The parser extracts and validates. Only `(prompt ID set, closed enums, free-text
    category name)` survives; the free text is display-only and HTML-escaped.
-6. **Results.** Recipe categories and AI categories are merged; real names are restored for
-   display only in the local UI.
+6. **Results.** Recipe categories and AI categories are merged and sorted by reclaimable
+   size; real names are restored for display only in the local UI, from the placeholders
+   of items in the current export (D-047). Explanations of AI categories are lazy: the
+   user queues categories, and the next export round is a round B prompt that lists them
+   by number, the assistant's own name and IDs. Round B replies are display-only text
+   (what, lost, steps); they can never select, add or change items (D-045, D-046).
 7. **Delete.** The UI sends category and item IDs. The server resolves them against the
    session, applies the guards in §5, re-verifies size and mtime, then recycles.
 

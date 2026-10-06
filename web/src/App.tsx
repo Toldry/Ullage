@@ -3,11 +3,13 @@ import { InvalidSession, Main, Sidebar, StatusBar, TopBar, type Screen } from '.
 import { api, ApiError, SessionExpiredError } from './lib/api';
 import { formatBytes } from './lib/format';
 import type {
-  Config, ExportView, LogLine, Overview, Progress, Status, Volume,
+  Config, ExportView, LogLine, Overview, Progress, ResultCategory, Status, Volume,
 } from './lib/types';
 import { OverviewScreen } from './screens/OverviewScreen';
 import { ExportScreen } from './screens/ExportScreen';
 import { PasteScreen } from './screens/PasteScreen';
+import { ResultsScreen } from './screens/ResultsScreen';
+import { pruneSelection } from './lib/results';
 import { RedactScreen } from './screens/RedactScreen';
 import { RulesScreen } from './screens/RulesScreen';
 import { ScanningScreen } from './screens/ScanningScreen';
@@ -38,6 +40,10 @@ export function App() {
   const [batch, setBatch] = useState(1);
   const [exportCode, setExportCode] = useState('');
   const onExportLoaded = useCallback((view: ExportView) => setExportCode(view.code), []);
+  // Selected result items, kept here so step 7 can pick them up.
+  const [deletionSelection, setDeletionSelection] = useState<Set<string>>(new Set());
+  const onResultsLoaded = useCallback((categories: ResultCategory[]) =>
+    setDeletionSelection((previous) => pruneSelection(categories, previous)), []);
   const appElement = useRef<HTMLDivElement>(null);
 
   // Any rejected session (wrong or missing token) switches to the invalid-link state.
@@ -135,11 +141,11 @@ export function App() {
     if (result) setError('Relaunching as administrator. A new tab will open; close this one.');
   }, [guard]);
 
-  const reachedStep = overview ? 5 : 1;
+  const reachedStep = overview ? 6 : 1;
 
   const navigate = useCallback((target: Screen) => {
     if (target === 'scan' && screen === 'scanning') return;
-    const needsScan: Screen[] = ['overview', 'redact', 'export', 'paste'];
+    const needsScan: Screen[] = ['overview', 'redact', 'export', 'paste', 'results'];
     if (needsScan.includes(target) && !overview) return;
     if ([...needsScan, 'scan', 'rules'].includes(target)) setScreen(target);
   }, [screen, overview]);
@@ -161,6 +167,7 @@ export function App() {
     else if (event.key === '3') navigate('redact');
     else if (event.key === '4') navigate('export');
     else if (event.key === '5') navigate('paste');
+    else if (event.key === '6') navigate('results');
     else if (event.key === 'r' || event.key === 'R') navigate('rules');
     else if (event.key === 't' || event.key === 'T') toggleTheme();
     else if (event.key === 'Enter' && screen === 'scan' && target.tagName !== 'BUTTON') {
@@ -278,7 +285,14 @@ export function App() {
           )}
           {screen === 'paste' && (
             <PasteScreen guard={guard} batch={batch} onBatchChange={setBatch}
-              onGoExport={() => setScreen('export')} />
+              onGoExport={() => setScreen('export')}
+              onGoResults={() => setScreen('results')} />
+          )}
+          {screen === 'results' && (
+            <ResultsScreen guard={guard} selection={deletionSelection}
+              onSelectionChange={setDeletionSelection} onResultsLoaded={onResultsLoaded}
+              onGoExport={(round) => { setBatch(round); setScreen('export'); }}
+              onRescan={() => { setError(''); setScreen('scan'); }} />
           )}
         </Main>
       </div>

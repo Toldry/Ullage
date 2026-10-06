@@ -5,20 +5,28 @@ import (
 	"time"
 
 	"github.com/toldry/ullage/internal/prompt"
+	"github.com/toldry/ullage/internal/redact"
 	"github.com/toldry/ullage/internal/response"
 )
 
 // exportState is guarded by Manager.lock.
 type exportState struct {
-	export           *prompt.Export
+	export *prompt.Export
+	// redactor is the one the export was rendered with, so names are restored exactly as
+	// the assistant saw them even after the rules change.
+	redactor         *redact.Redactor
 	redactionVersion int
 	imports          map[int]BatchImport
+	explanations     explanationState
 }
 
 // BatchImport is a validated reply for one batch.
 type BatchImport struct {
 	Categories []response.Category `json:"categories"`
-	ImportedAt time.Time           `json:"importedAt"`
+	// Numbers gives each category a number that stays unique for this export, so round B
+	// can refer to it even after other batches are imported again.
+	Numbers    []int     `json:"numbers"`
+	ImportedAt time.Time `json:"importedAt"`
 }
 
 // BatchView describes one batch on the Export and Paste screens.
@@ -42,6 +50,8 @@ type ExportView struct {
 	// Stale means redactions changed after a reply was imported; the export keeps the
 	// imported results until the user rebuilds it.
 	Stale bool `json:"stale"`
+	// Explanation is the round B prompt, present while categories are queued.
+	Explanation *ExplanationView `json:"explanation,omitempty"`
 }
 
 func (manager *Manager) promptOptions() prompt.Options {
@@ -80,8 +90,10 @@ func (manager *Manager) currentExport(forceRebuild bool) (*prompt.Export, bool, 
 	built := prompt.Build(manager.completed.Result.Tree, redactor, code,
 		manager.promptOptions())
 	state.export = &built
+	state.redactor = redactor
 	state.redactionVersion = manager.redaction.version
 	state.imports = map[int]BatchImport{}
+	state.explanations = newExplanationState()
 	// Keep the placeholder numbers this prompt used for later sessions (D-034). A failed
 	// save only affects numbering next time, never what this prompt contains.
 	_ = manager.saveRules()
@@ -109,6 +121,7 @@ func (manager *Manager) exportView(export *prompt.Export, stale bool) ExportView
 		}
 		view.Batches = append(view.Batches, batchView)
 	}
+	view.Explanation = manager.explanationView()
 	return view
 }
 
@@ -130,13 +143,15 @@ type PasteRequest struct {
 	Text  string `json:"text"`
 }
 
-// PasteResult is what the Paste screen shows.
+// PasteResult is what the Paste screen shows. Round B replies fill Explanations instead
+// of Result.
 type PasteResult struct {
-	Result   response.Result `json:"result"`
-	Valid    bool            `json:"valid"`
-	Repair   string          `json:"repair,omitempty"`
-	Imported bool            `json:"imported"`
-	Export   ExportView      `json:"export"`
+	Result       response.Result             `json:"result"`
+	Explanations *response.ExplanationResult `json:"explanations,omitempty"`
+	Valid        bool                        `json:"valid"`
+	Repair       string                      `json:"repair,omitempty"`
+	Imported     bool                        `json:"imported"`
+	Export       ExportView                  `json:"export"`
 }
 
 // ErrNoExport means a reply was pasted before any prompt existed.
@@ -153,6 +168,9 @@ func (manager *Manager) Paste(request PasteRequest) (PasteResult, error) {
 	if export == nil {
 		return PasteResult{}, ErrNoExport
 	}
+	if round := manager.explanationRound(); round != 0 && request.Batch == round {
+		return manager.pasteExplanations(request.Text), nil
+	}
 	if request.Batch < 1 || request.Batch > len(export.Batches) {
 		return PasteResult{}, errors.New("no such batch")
 	}
@@ -162,8 +180,7 @@ func (manager *Manager) Paste(request PasteRequest) (PasteResult, error) {
 	parsed := response.Parse(request.Text, expectation)
 	result := PasteResult{Result: parsed, Valid: parsed.Valid()}
 	if result.Valid {
-		manager.exportState.imports[batch.Number] = BatchImport{
-			Categories: parsed.Categories, ImportedAt: time.Now()}
+		manager.importBatch(batch.Number, parsed.Categories)
 		result.Imported = true
 	} else {
 		result.Repair = response.RepairPrompt(parsed, expectation)
@@ -173,7 +190,22 @@ func (manager *Manager) Paste(request PasteRequest) (PasteResult, error) {
 	return result, nil
 }
 
-// Imports returns the validated categories per batch, for the Results screen.
+// importBatch stores a batch's categories. Importing a batch again replaces its
+// categories, and whatever was explained or queued for the old ones is dropped with them.
+func (manager *Manager) importBatch(batch int, categories []response.Category) {
+	state := &manager.exportState
+	if previous, found := state.imports[batch]; found {
+		state.explanations.forget(previous.Numbers)
+	}
+	numbers := make([]int, len(categories))
+	for index := range categories {
+		numbers[index] = state.explanations.allocateNumber()
+	}
+	state.imports[batch] = BatchImport{Categories: categories, Numbers: numbers,
+		ImportedAt: time.Now()}
+}
+
+// Imports returns the validated categories per batch.
 func (manager *Manager) Imports() (*prompt.Export, map[int]BatchImport) {
 	manager.lock.Lock()
 	defer manager.lock.Unlock()

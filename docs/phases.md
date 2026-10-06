@@ -8,8 +8,8 @@ for review. Status is updated as phases land.
 | 0 | Stack, architecture, plan | — | Done, approved |
 | 1 | Scanner, tiers, recipes, hardened server, Scan and Overview screens | Scanner fixtures, localhost security, no-network checks | Done, reviewed |
 | 2 | Redaction engine, encrypted rules store, redaction review and rules screens; dates, file types and non-developer recipes | Leak test, fail-closed test, rename-following | Done, approved |
-| 3 | Prompt builder, parser, validator, repair prompts, Export and Paste screens | Parser fixtures, injection, token estimator | Done, awaiting review |
-| 4 | Results screen, round B explanations, low-confidence gating | Merge and sort, round B parser | Planned |
+| 3 | Prompt builder, parser, validator, repair prompts, Export and Paste screens | Parser fixtures, injection, token estimator | Done, approved |
+| 4 | Results screen, round B explanations, low-confidence gating | Merge and sort, round B parser | Done, awaiting review |
 | 5 | Deletion pipeline and confirmation screen | Guard refusals, change detection, partial failures | Planned |
 | 6 | History, all design states, packaging, Start menu shortcut, README | End-to-end on Windows CI | Planned |
 
@@ -127,3 +127,38 @@ Tested:
   example parses, redacted items carry only their size, content-aware rollup.
 - Session tests for the export lifecycle and fail-closed behavior; a headless Chromium run
   of export, copy, a rejected paste and a successful import.
+
+Deviations reported: D-035 to D-042. Review outcome: approved; no enum synonyms (D-039).
+
+## Phase 4 summary
+
+Built:
+
+- `results`: recipe categories (grouped per recipe, nested claims counted once,
+  installed apps and small categories left out) merged with AI categories, sorted by
+  reclaimable size; `del 0` rows kept aside; a summary of everything not listed (D-043).
+  Real names restored locally from the export's own placeholders (D-047).
+- Round B: a queue of AI categories, the round B prompt (numbers, the assistant's names,
+  IDs, the 25-word cap stated), its parser and repair prompt, and import (D-044, D-045).
+- Low-confidence gating recorded by the server (D-048).
+- Results screen (step 6) per the design: source, confidence and regenerable filters,
+  expandable rows with explanation, managed steps, brute-force policy and the item list
+  with real names; queued note linking to the export round; keys j / k / Enter / x.
+  Export and Paste screens show the round B prompt as the step after the batches.
+
+Tested:
+
+- Merge and sort, nested claims, thresholds, installed apps, kept categories, summary
+  totals, restoration, unknown IDs, gating and queue states (`internal/results`).
+- Round B parser fixtures: the spec example, tolerant wrapping, wrong session,
+  truncation, unrequested and duplicate numbers, missing fields, step limits, overlong
+  and empty fields, a round A reply in the wrong slot, bidi and control characters.
+- Session round trip: queue, round B prompt without redacted names and with every data
+  line a `#n` line, invalid and valid replies, partial answers staying queued, re-import
+  dropping stale explanations.
+- Server method rules for the new endpoints; frontend selection and round helpers.
+- Headless Chromium: import, Results, low-confidence unlock on expand, request, round B
+  export and paste, explanation shown, dark and light themes; no console errors, CSP
+  violations or remote requests.
+
+Deviations reported: D-043 to D-050; design conflicts 15 to 18. D-050 needs a decision.

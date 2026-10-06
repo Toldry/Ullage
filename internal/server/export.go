@@ -47,3 +47,51 @@ func (server *Server) handlePaste(writer http.ResponseWriter, request *http.Requ
 	}
 	writeJSON(writer, http.StatusOK, result)
 }
+
+func writeResultsError(writer http.ResponseWriter, err error) {
+	if errors.Is(err, session.ErrNoSuchCategory) {
+		writeJSONError(writer, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSONError(writer, http.StatusConflict, err.Error())
+}
+
+func (server *Server) handleResults(writer http.ResponseWriter, _ *http.Request) {
+	view, err := server.manager.Results()
+	if err != nil {
+		writeResultsError(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, view)
+}
+
+func (server *Server) handleRequestExplanation(writer http.ResponseWriter,
+	request *http.Request) {
+	var explanation session.ExplanationRequest
+	if err := decodeJSON(request, &explanation); err != nil {
+		writeJSONError(writer, http.StatusBadRequest, "invalid request: "+err.Error())
+		return
+	}
+	view, err := server.manager.RequestExplanation(explanation)
+	if err != nil {
+		writeResultsError(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, view)
+}
+
+func (server *Server) handleExpand(writer http.ResponseWriter, request *http.Request) {
+	var expand struct {
+		Key string `json:"key"`
+	}
+	if err := decodeJSON(request, &expand); err != nil {
+		writeJSONError(writer, http.StatusBadRequest, "invalid request: "+err.Error())
+		return
+	}
+	view, err := server.manager.MarkExpanded(expand.Key)
+	if err != nil {
+		writeResultsError(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, view)
+}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { Kbd } from '../components/Controls';
 import { copyText } from '../lib/clipboard';
 import { checkLabels, exportApi } from '../lib/exporting';
+import { roundsOf } from '../lib/results';
 import { formatCount } from '../lib/format';
 import type { CheckName, ExportView, PasteResult } from '../lib/types';
 import { BatchStepper } from './ExportScreen';
@@ -11,11 +12,12 @@ interface Props {
   batch: number;
   onBatchChange: (batch: number) => void;
   onGoExport: () => void;
+  onGoResults: () => void;
 }
 
 const checkOrder: CheckName[] = ['session', 'complete', 'format', 'ids', 'duplicates'];
 
-export function PasteScreen({ guard, batch, onBatchChange, onGoExport }: Props) {
+export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResults }: Props) {
   const [view, setView] = useState<ExportView | null>(null);
   const [text, setText] = useState('');
   const [outcome, setOutcome] = useState<PasteResult | null>(null);
@@ -48,15 +50,20 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport }: Props) 
       </div>
     );
   }
-  const current = view.batches[Math.min(batch, view.batches.length) - 1];
+  const rounds = roundsOf(view);
+  const current = rounds[Math.min(batch, rounds.length) - 1];
+  const explaining = current.kind === 'explain';
   const nextBatch = view.batches.find((item) => !item.imported && item.number !== batch);
+  const replyName = explaining ? 'the explanations' : `batch ${current.number}`;
+  const parsed = outcome?.explanations ?? outcome?.result;
 
   return (
     <div class="screen screen-wide">
       <div class="screen-header">
         <PasteHeading code={view.code} />
-        <BatchStepper count={view.batches.length} current={current.number}
-          done={(number) => view.batches[number - 1].imported}
+        <BatchStepper count={rounds.length} current={current.number}
+          label={explaining ? 'Explanations' : undefined}
+          done={(number) => rounds[number - 1].imported}
           onPick={(number) => { onBatchChange(number); setOutcome(null); }} />
       </div>
       <div class="export-grid">
@@ -71,8 +78,8 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport }: Props) 
               <span class="faint normal-case">Prose and ``` fences around the block are fine</span>
             </div>
             <textarea class="paste-input" spellcheck={false} value={text}
-              aria-label={`Reply for batch ${current.number}`}
-              placeholder={`Paste the assistant's reply for batch ${current.number} here.`}
+              aria-label={`Reply for ${replyName}`}
+              placeholder={`Paste the assistant's reply for ${replyName} here.`}
               onInput={(event) => setText((event.target as HTMLTextAreaElement).value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
@@ -92,7 +99,7 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport }: Props) 
             <span class="small faint">Pasted text never leaves this tab and this PC.</span>
           </div>
           {outcome && (
-            <Outcome outcome={outcome} batchNumber={current.number}
+            <Outcome outcome={outcome} batchNumber={current.number} explaining={explaining}
               batchCount={view.batches.length} nextBatch={nextBatch?.number}
               copyNote={copyNote} repairElement={repairElement}
               onCopyRepair={async () => {
@@ -101,16 +108,16 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport }: Props) 
                   : 'The text is selected: press Ctrl+C.');
               }}
               onNextBatch={(number) => { onBatchChange(number); clear(); onGoExport(); }}
-              onCopyPromptAgain={onGoExport} />
+              onCopyPromptAgain={onGoExport} onGoResults={onGoResults} />
           )}
         </div>
         <div class="side-column">
           <div class="panel checks">
             <div class="section-title">Checks</div>
             {checkOrder.map((check) => {
-              const state = !outcome ? 'skip'
-                : outcome.result.problems.some((problem) => problem.check === check) ? 'fail'
-                  : check !== 'session' && check !== 'complete' && !outcome.result.found
+              const state = !parsed ? 'skip'
+                : parsed.problems.some((problem) => problem.check === check) ? 'fail'
+                  : check !== 'session' && check !== 'complete' && !parsed.found
                     ? 'skip' : 'pass';
               return (
                 <div class="check-row" key={check}>
@@ -118,7 +125,9 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport }: Props) 
                   <span class={`check-label check-${state}`}>
                     {state === 'skip' ? '–' : state}
                   </span>
-                  <span>{checkLabels[check]}</span>
+                  <span>
+                    {explaining && check === 'ids' ? 'Category numbers' : checkLabels[check]}
+                  </span>
                 </div>
               );
             })}
@@ -170,11 +179,38 @@ function Outcome(props: {
   onCopyRepair: () => void;
   onNextBatch: (number: number) => void;
   onCopyPromptAgain: () => void;
+  onGoResults: () => void;
+  explaining: boolean;
 }) {
   const { outcome } = props;
-  const problems = outcome.result.problems;
+  const parsed = outcome.explanations ?? outcome.result;
+  const problems = parsed.problems;
   const sessionMismatch = problems.some((problem) => problem.check === 'session');
-  const truncated = outcome.result.truncated && problems.length === 1;
+  const truncated = parsed.truncated && problems.length === 1;
+  const promptName = props.explaining ? 'explanation' : `batch ${props.batchNumber}`;
+  if (outcome.valid && outcome.explanations) {
+    const { explanations, missing } = outcome.explanations;
+    return (
+      <div class="result-card tone-ok">
+        <div class="result-title">
+          Imported {explanations.length}{' '}
+          {explanations.length === 1 ? 'explanation' : 'explanations'}
+        </div>
+        <div class="muted">
+          {missing.length
+            ? `${missing.length} requested ${missing.length === 1 ? 'category was' :
+              'categories were'} not explained and ${missing.length === 1 ? 'stays' : 'stay'} ` +
+              'queued for the next round.'
+            : 'Every requested category is explained.'}
+        </div>
+        <div class="actions">
+          <button type="button" class="button button-primary" onClick={props.onGoResults}>
+            Back to results
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (outcome.valid) {
     const empty = outcome.result.categories.length === 0;
     return (
@@ -194,7 +230,9 @@ function Outcome(props: {
               Copy batch {props.nextBatch} prompt
             </button>
           ) : (
-            <span class="small faint">All batches imported. Results arrive in the next phase.</span>
+            <button type="button" class="button button-primary" onClick={props.onGoResults}>
+              See results
+            </button>
           )}
         </div>
       </div>
@@ -206,7 +244,7 @@ function Outcome(props: {
       : `${problems.length} ${problems.length === 1 ? 'problem' : 'problems'} in the response`;
   const body = sessionMismatch
     ? 'This reply belongs to another prompt, probably from an older conversation. Paste ' +
-      `the reply to the current batch ${props.batchNumber} prompt, or copy the prompt again.`
+      `the reply to the current ${promptName} prompt, or copy the prompt again.`
     : 'Nothing was imported. The repair prompt lists each problem and asks for the full ' +
       'corrected reply; paste it into the same conversation.';
   return (
@@ -234,7 +272,7 @@ function Outcome(props: {
       <div class="actions">
         {sessionMismatch ? (
           <button type="button" class="button button-primary" onClick={props.onCopyPromptAgain}>
-            Copy batch {props.batchNumber} prompt again
+            Copy {promptName} prompt again
           </button>
         ) : (
           <button type="button" class="button button-primary" onClick={props.onCopyRepair}>

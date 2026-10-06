@@ -137,6 +137,9 @@ func (server *Server) apiRoutes() map[string]route {
 		"/api/export/rebuild":     {method: http.MethodPost, handler: server.handleRebuildExport},
 		"/api/paste": {method: http.MethodPost, handler: server.handlePaste,
 			maximumBodyBytes: maximumPasteBytes},
+		"/api/results":         {method: http.MethodGet, handler: server.handleResults},
+		"/api/results/explain": {method: http.MethodPost, handler: server.handleRequestExplanation},
+		"/api/results/expand":  {method: http.MethodPost, handler: server.handleExpand},
 	}
 }
 

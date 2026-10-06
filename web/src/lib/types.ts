@@ -218,6 +218,24 @@ export interface ExportView {
   unknownBytes: number;
   minimumItemBytes: number;
   stale: boolean;
+  explanation?: ExplanationView;
+}
+
+// Round B prompt (internal/session/results.go)
+export interface ExplanationView {
+  round: number;
+  text: string;
+  categories: number;
+  characters: number;
+  tokenEstimate: number;
+}
+
+export interface ParsedExplanation {
+  number: number;
+  what: string;
+  lost: string;
+  steps: string[];
+  line: number;
 }
 
 export type CheckName = 'session' | 'complete' | 'format' | 'ids' | 'duplicates';
@@ -247,8 +265,85 @@ export interface PasteResult {
     problems: Problem[];
     classified: number;
   };
+  explanations?: {
+    found: boolean;
+    foundCode: string;
+    truncated: boolean;
+    explanations: ParsedExplanation[];
+    missing: number[];
+    problems: Problem[];
+  };
   valid: boolean;
   repair?: string;
   imported: boolean;
   export: ExportView;
+}
+
+// Results (internal/results, internal/session/results.go)
+export interface ResultStep {
+  text: string;
+  command?: string;
+}
+
+export interface ResultExplanation {
+  what: string;
+  lost: string;
+  steps: ResultStep[];
+  note?: string;
+  round?: number;
+  receivedAt?: string;
+}
+
+export interface ResultItem {
+  key: string;
+  kind: 'file' | 'folder' | 'loose';
+  path: string;
+  exportedAs?: string;
+  bytes: number;
+  files: number;
+  modified: number;
+}
+
+export interface ResultCategory {
+  key: string;
+  number?: number;
+  name: string;
+  restoredFrom?: string;
+  source: 'recipe' | 'ai';
+  recipeId?: string;
+  recipeVersion?: number;
+  batch?: number;
+  importedAt?: string;
+  confidence: 'recipe' | 'high' | 'med' | 'low';
+  regenerable: 'yes' | 'partially' | 'no';
+  bytes: number;
+  files: number;
+  itemCount: number;
+  root: string;
+  items: ResultItem[];
+  moreItems: number;
+  moreBytes: number;
+  explanation?: ResultExplanation;
+  explanationState: 'recipe' | 'none' | 'queued' | 'received';
+  bruteForce: { allowed: boolean; reason?: string };
+  needsExpand: boolean;
+  selectable: boolean;
+}
+
+export interface ResultsView {
+  categories: ResultCategory[];
+  kept: ResultCategory[];
+  summary: {
+    systemBytes: number;
+    knownKeptBytes: number;
+    keptByAiBytes: number;
+    unclassifiedBytes: number;
+    reclaimableBytes: number;
+  };
+  code: string;
+  batchCount: number;
+  batchesImported: number;
+  queuedCount: number;
+  explanationRound: number;
+  minimumItemBytes: number;
 }
