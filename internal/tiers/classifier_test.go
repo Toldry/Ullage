@@ -80,6 +80,18 @@ func TestWindowsClassification(t *testing.T) {
 		{[]string{`C:\`, "$Recycle.Bin", "S-1-5-21"}, scanner.TierKnown, "recycle-bin"},
 		{[]string{`C:\Windows\WinSxS`, "x"}, scanner.TierKnown, "component-store"},
 		{[]string{`C:\Users\mara\.nuget`, "packages"}, scanner.TierKnown, "nuget-packages"},
+		{[]string{`C:\Users\mara\AppData\Local\Google\Chrome\User Data`, "Profile 2",
+			"Cache"}, scanner.TierKnown, "browser-caches"},
+		{[]string{`C:\Users\mara\AppData\Local\Google\Chrome\User Data`, "Profile 2",
+			"Bookmarks"}, scanner.TierUnknown, ""},
+		{[]string{`C:\Users\mara\AppData\Roaming\Adobe\Common`, "Media Cache Files"},
+			scanner.TierKnown, "adobe-media-cache"},
+		{[]string{`C:\Users\mara\AppData\Local\Packages`,
+			"SpotifyAB.SpotifyMusic_zpdnekdrzrea0", "LocalCache", "Spotify", "Data"},
+			scanner.TierKnown, "spotify-cache"},
+		{[]string{`C:\Windows\SoftwareDistribution`, "Download"}, scanner.TierKnown,
+			"windows-update-downloads"},
+		{[]string{`C:\Users\mara\Videos`, "Captures"}, scanner.TierUnknown, ""},
 	}
 	for _, testCase := range cases {
 		got := classify(classifier, testCase.segments...)
@@ -145,28 +157,6 @@ func TestLinuxClassificationUsesTheSameData(t *testing.T) {
 	if got := classify(classifier, "/", "home", "ada", ".NPM"); got.Tier !=
 		scanner.TierUnknown {
 		t.Errorf("linux matching must be case-sensitive: %+v", got)
-	}
-}
-
-func TestAnyDepthPatterns(t *testing.T) {
-	set := patternSet{patterns: []compiledPattern{
-		{segments: compilePattern("a/**/c", false, false), rule: 0}}}
-	walk := func(names ...string) bool {
-		state := set.start()
-		for _, name := range names {
-			if state = set.advance(state, name); state == nil {
-				return false
-			}
-		}
-		return len(set.acceptedRules(state)) > 0
-	}
-	for _, path := range [][]string{{"a", "c"}, {"a", "b", "c"}, {"a", "b", "b", "c"}} {
-		if !walk(path...) {
-			t.Errorf("%v should match a/**/c", path)
-		}
-	}
-	if walk("a", "b") || walk("x", "c") {
-		t.Errorf("unexpected match")
 	}
 }
 

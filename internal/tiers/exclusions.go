@@ -3,18 +3,19 @@ package tiers
 import (
 	"strings"
 
+	"github.com/toldry/ullage/internal/pathpattern"
 	"github.com/toldry/ullage/internal/platform"
 )
 
 // PathMatcher tests full paths against user-written patterns such as "~/vault/**",
 // "D:/vm/**" or a bare folder name like "secrets", which matches at any depth.
 type PathMatcher struct {
-	patterns patternSet
+	patterns *pathpattern.Set
 }
 
 // NewPathMatcher compiles user patterns. "~" stands for the current user's profile.
 func NewPathMatcher(patterns []string, locations platform.KnownLocations) *PathMatcher {
-	matcher := &PathMatcher{patterns: patternSet{caseInsensitive: locations.CaseInsensitive}}
+	matcher := &PathMatcher{patterns: pathpattern.NewSet(locations.CaseInsensitive)}
 	profiles := locations.Variables["CurrentUserProfile"]
 	for _, pattern := range patterns {
 		pattern = strings.TrimSpace(pattern)
@@ -32,11 +33,7 @@ func NewPathMatcher(patterns []string, locations platform.KnownLocations) *PathM
 			}
 		}
 		for _, path := range expanded {
-			segments := compilePattern(path, false, locations.CaseInsensitive)
-			if len(segments) > 0 {
-				matcher.patterns.patterns = append(matcher.patterns.patterns,
-					compiledPattern{segments: segments})
-			}
+			matcher.patterns.Add(path, false, 0)
 		}
 	}
 	return matcher
@@ -44,14 +41,5 @@ func NewPathMatcher(patterns []string, locations platform.KnownLocations) *PathM
 
 // Matches reports whether path matches any pattern.
 func (matcher *PathMatcher) Matches(path string) bool {
-	if len(matcher.patterns.patterns) == 0 {
-		return false
-	}
-	state := matcher.patterns.start()
-	for _, segment := range SplitPath(path) {
-		if state = matcher.patterns.advance(state, segment); state == nil {
-			return false
-		}
-	}
-	return len(matcher.patterns.acceptedRules(state)) > 0
+	return len(matcher.patterns.MatchesPath(path)) > 0
 }

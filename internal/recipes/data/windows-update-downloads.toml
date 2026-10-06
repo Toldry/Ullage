@@ -1,0 +1,18 @@
+id = "windows-update-downloads"
+version = 1
+name = "Windows Update downloads"
+what = "Update packages Windows downloaded and has usually installed already."
+lost = "Nothing once the updates are installed; pending updates download again."
+regenerable = "yes"
+
+[paths]
+windows = ["{SystemRoot}/SoftwareDistribution/Download"]
+
+[[managed_steps]]
+text = """\
+  Settings > System > Storage > Temporary files, then select Windows Update Cleanup."""
+command = "start ms-settings:storagesense"
+
+[brute_force]
+allowed = false
+reason = "It is under the Windows folder, where Ullage never deletes."

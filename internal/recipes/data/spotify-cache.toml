@@ -1,0 +1,22 @@
+id = "spotify-cache"
+version = 1
+name = "Spotify cache and offline music"
+what = "Streamed songs Spotify keeps, plus music downloaded for offline listening."
+lost = """\
+  Offline downloads must be downloaded again before they play without a connection. \
+  Nothing in your account is affected."""
+regenerable = "partially"
+
+[paths]
+windows = [
+  "{UserProfile}/AppData/Local/Spotify/Storage",
+  "{UserProfile}/AppData/Local/Spotify/Data",
+  "{UserProfile}/AppData/Local/Packages/SpotifyAB.SpotifyMusic_*/LocalCache/Spotify/Data",
+]
+linux = ["{UserProfile}/.cache/spotify"]
+
+[[managed_steps]]
+text = "Spotify: Settings > Storage > Clear cache."
+
+[brute_force]
+allowed = true

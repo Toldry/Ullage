@@ -1,8 +1,11 @@
+// Package tiers decides which tier every scanned item belongs to: System, Known (claimed by
+// a recipe) or Unknown.
 package tiers
 
 import (
 	"strings"
 
+	"github.com/toldry/ullage/internal/pathpattern"
 	"github.com/toldry/ullage/internal/platform"
 	"github.com/toldry/ullage/internal/recipes"
 	"github.com/toldry/ullage/internal/scanner"
@@ -23,7 +26,7 @@ type rule struct {
 
 // Classifier implements scanner.Classifier from recipes and System-tier rules.
 type Classifier struct {
-	patterns patternSet
+	patterns *pathpattern.Set
 	rules    []rule
 	Claims   []Claim
 }
@@ -32,7 +35,7 @@ type Classifier struct {
 // and recipes in priority order, so the first accepted rule wins.
 func New(library *recipes.Library, locations platform.KnownLocations, platformName string,
 	applications []platform.InstalledApplication) *Classifier {
-	classifier := &Classifier{patterns: patternSet{caseInsensitive: locations.CaseInsensitive}}
+	classifier := &Classifier{patterns: pathpattern.NewSet(locations.CaseInsensitive)}
 
 	for _, recipe := range library.Recipes {
 		if recipe.Dynamic == recipes.DynamicInstalledApplications {
@@ -66,13 +69,8 @@ func (classifier *Classifier) addRule(newRule rule) int32 {
 
 func (classifier *Classifier) addPattern(pattern string, ruleIndex int32, literal bool,
 	locations platform.KnownLocations) {
-	for _, expanded := range expandVariables(pattern, locations) {
-		segments := compilePattern(expanded, literal, locations.CaseInsensitive)
-		if len(segments) == 0 {
-			continue
-		}
-		classifier.patterns.patterns = append(classifier.patterns.patterns,
-			compiledPattern{segments: segments, rule: ruleIndex})
+	for _, expanded := range pathpattern.ExpandVariables(pattern, locations) {
+		classifier.patterns.Add(expanded, literal, ruleIndex)
 	}
 }
 
@@ -116,8 +114,8 @@ func (classifier *Classifier) Root(rootPath string) (scanner.Classification,
 	scanner.ClassifierState) {
 	classification := scanner.Classification{Tier: scanner.TierUnknown,
 		ClaimID: scanner.NoClaim}
-	var state scanner.ClassifierState = classifier.patterns.start()
-	for _, segment := range SplitPath(rootPath) {
+	var state scanner.ClassifierState = classifier.patterns.Start()
+	for _, segment := range pathpattern.SplitPath(rootPath) {
 		if state == nil {
 			break
 		}
@@ -131,16 +129,16 @@ func (classifier *Classifier) Root(rootPath string) (scanner.Classification,
 func (classifier *Classifier) Child(parent scanner.Classification,
 	state scanner.ClassifierState, name string, _ platform.EntryKind) (
 	scanner.Classification, scanner.ClassifierState) {
-	current, _ := state.(*matchState)
+	current, _ := state.(*pathpattern.State)
 	if parent.Tier == scanner.TierKnown || current == nil {
 		return parent, nil
 	}
-	next := classifier.patterns.advance(current, name)
+	next := classifier.patterns.Advance(current, name)
 	if next == nil {
 		return parent, nil
 	}
 	best := int32(-1)
-	for _, ruleIndex := range classifier.patterns.acceptedRules(next) {
+	for _, ruleIndex := range classifier.patterns.Accepted(next) {
 		if best == -1 || ruleIndex < best {
 			best = ruleIndex
 		}
@@ -186,7 +184,7 @@ func (guard *installLocationGuard) addProtected(location string) {
 }
 
 func (guard installLocationGuard) normalize(location string) []string {
-	segments := SplitPath(location)
+	segments := pathpattern.SplitPath(location)
 	if guard.caseInsensitive {
 		for index := range segments {
 			segments[index] = strings.ToLower(segments[index])

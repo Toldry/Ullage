@@ -1,0 +1,18 @@
+id = "thumbnail-cache"
+version = 1
+name = "Explorer thumbnail and icon cache"
+what = "Small previews of pictures, videos and documents that File Explorer keeps."
+lost = "Nothing. Thumbnails are drawn again the next time a folder is opened."
+regenerable = "yes"
+
+[paths]
+windows = ["{UserProfile}/AppData/Local/Microsoft/Windows/Explorer"]
+linux = ["{UserProfile}/.cache/thumbnails"]
+
+[[managed_steps]]
+text = "Run Disk Cleanup and select Thumbnails."
+command = "cleanmgr.exe"
+
+[brute_force]
+allowed = false
+reason = "File Explorer keeps these files open; Disk Cleanup removes them safely."

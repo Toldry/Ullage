@@ -1,0 +1,27 @@
+id = "gpu-shader-cache"
+version = 1
+name = "Graphics shader caches"
+what = """\
+  Compiled graphics shaders that DirectX and the NVIDIA and AMD drivers keep so games and \
+  creative apps start and render faster."""
+lost = """\
+  Nothing permanent. Games may stutter briefly the next time they run while shaders are \
+  compiled again."""
+regenerable = "yes"
+
+[paths]
+windows = [
+  "{UserProfile}/AppData/Local/D3DSCache",
+  "{UserProfile}/AppData/Local/NVIDIA/DXCache",
+  "{UserProfile}/AppData/Local/NVIDIA/GLCache",
+  "{UserProfile}/AppData/Local/AMD/DxCache",
+  "{UserProfile}/AppData/Local/AMD/DxcCache",
+]
+linux = ["{UserProfile}/.cache/nvidia", "{UserProfile}/.cache/mesa_shader_cache"]
+
+[[managed_steps]]
+text = "Run Disk Cleanup and select DirectX Shader Cache."
+command = "cleanmgr.exe"
+
+[brute_force]
+allowed = true

@@ -1,0 +1,26 @@
+id = "phone-backups"
+version = 1
+name = "iPhone and iPad backups"
+what = """\
+  Full device backups made by iTunes or the Apple Devices app, one folder per backup."""
+lost = """\
+  The backup. If it is the only copy of photos or messages from an old or lost device, \
+  they are gone for good."""
+regenerable = "no"
+
+[paths]
+windows = [
+  "{UserProfile}/AppData/Roaming/Apple Computer/MobileSync/Backup",
+  "{UserProfile}/Apple/MobileSync/Backup",
+]
+
+[[managed_steps]]
+text = """\
+  Apple Devices app: select the device > Manage Backups, then delete the backups you no \
+  longer need. In iTunes: Edit > Preferences > Devices."""
+
+[brute_force]
+allowed = false
+reason = """\
+  Backups may be the only copy of a device's data, and the Apple app keeps an index of \
+  them; delete them from the app after checking which device each one belongs to."""

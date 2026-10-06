@@ -297,6 +297,7 @@ func (scan *Scan) addRoot(rootPath string) {
 	if info, err := platform.DescribeRoot(rootPath); err == nil {
 		node.ID = info.ID
 		node.ModifiedUnixNanos = info.ModifiedUnixNanos
+		node.CreatedUnixNanos = info.CreatedUnixNanos
 	}
 	scan.tree.Roots = append(scan.tree.Roots, indices[0])
 	scan.recordClaim(indices[0], classification, NoClaim)
@@ -372,6 +373,7 @@ func (scan *Scan) processDirectory(job directoryJob) {
 		state          ClassifierState
 	}
 	var retained []retainedEntry
+	directoryNode.Extensions = dominantExtensions(entries)
 	for position := range entries {
 		entry := &entries[position]
 		classification, state := job.classification, ClassifierState(nil)
@@ -407,6 +409,7 @@ func (scan *Scan) processDirectory(job directoryJob) {
 		node.ClaimID = item.classification.ClaimID
 		node.Attributes = entry.Attributes
 		node.ModifiedUnixNanos = entry.ModifiedUnixNanos
+		node.CreatedUnixNanos = entry.CreatedUnixNanos
 		node.ID = entry.ID
 		node.LinkTarget = entry.LinkTarget
 		scan.recordClaim(index, item.classification, job.classification.ClaimID)

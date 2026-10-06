@@ -1,7 +1,10 @@
-// Package tiers decides which tier every scanned item belongs to: System, Known (claimed by
-// a recipe) or Unknown. It compiles recipe path patterns into a small NFA that advances
-// one path segment at a time, matching the order in which the scanner walks.
-package tiers
+// Package pathpattern compiles path patterns into a small NFA that advances one path
+// segment at a time, which matches the order in which the scanner walks a tree. Tier
+// classification, scan exclusions and redaction rules all use it.
+//
+// Pattern syntax: segments separated by / or \; * and ? match within one segment;
+// ** matches zero or more whole segments. Literal patterns treat every character as-is.
+package pathpattern
 
 import (
 	"path"
@@ -40,17 +43,17 @@ func (matcher segmentMatcher) matches(name string, caseInsensitive bool) bool {
 	}
 }
 
-// compiledPattern is one expanded pattern; rule is the index of the rule it belongs to.
+// compiledPattern is one expanded pattern; owner identifies the rule it belongs to.
 type compiledPattern struct {
 	segments []segmentMatcher
-	rule     int32
+	owner    int32
 }
 
 var variablePattern = regexp.MustCompile(`\{([A-Za-z0-9]+)\}`)
 
-// expandVariables replaces each {Variable} with every value the platform knows for it.
+// ExpandVariables replaces each {Variable} with every value the platform knows for it.
 // A pattern that refers to an unknown or empty variable expands to nothing.
-func expandVariables(pattern string, locations platform.KnownLocations) []string {
+func ExpandVariables(pattern string, locations platform.KnownLocations) []string {
 	match := variablePattern.FindStringSubmatchIndex(pattern)
 	if match == nil {
 		return []string{pattern}
@@ -62,7 +65,7 @@ func expandVariables(pattern string, locations platform.KnownLocations) []string
 			continue
 		}
 		replaced := pattern[:match[0]] + value + pattern[match[1]:]
-		expanded = append(expanded, expandVariables(replaced, locations)...)
+		expanded = append(expanded, ExpandVariables(replaced, locations)...)
 	}
 	return expanded
 }
@@ -107,19 +110,53 @@ type position struct {
 	matched int32
 }
 
-// matchState is the set of live positions after a path prefix. It is immutable once
-// built, so children can share their parent's state safely across goroutines.
-type matchState struct {
+// State is the set of live positions after a path prefix. It is immutable once built,
+// so children can share their parent's state safely across goroutines.
+type State struct {
 	positions []position
 }
 
-type patternSet struct {
+// Set is a group of patterns matched together.
+type Set struct {
 	patterns        []compiledPattern
 	caseInsensitive bool
 }
 
+// NewSet creates an empty set. caseInsensitive should follow the file system.
+func NewSet(caseInsensitive bool) *Set {
+	return &Set{caseInsensitive: caseInsensitive}
+}
+
+// Add compiles one already-expanded pattern for owner. It returns false for an empty
+// pattern.
+func (set *Set) Add(pattern string, literal bool, owner int32) bool {
+	segments := compilePattern(pattern, literal, set.caseInsensitive)
+	if len(segments) == 0 {
+		return false
+	}
+	set.patterns = append(set.patterns, compiledPattern{segments: segments, owner: owner})
+	return true
+}
+
+// Len returns the number of compiled patterns.
+func (set *Set) Len() int { return len(set.patterns) }
+
+// MatchesPath runs a whole path through the set and reports the accepted owners.
+func (set *Set) MatchesPath(path string) []int32 {
+	if len(set.patterns) == 0 {
+		return nil
+	}
+	state := set.Start()
+	for _, segment := range SplitPath(path) {
+		if state = set.Advance(state, segment); state == nil {
+			return nil
+		}
+	}
+	return set.Accepted(state)
+}
+
 // closure adds positions reachable without consuming a segment (skipping `**`).
-func (set *patternSet) closure(positions []position) []position {
+func (set *Set) closure(positions []position) []position {
 	for index := 0; index < len(positions); index++ {
 		current := positions[index]
 		segments := set.patterns[current.pattern].segments
@@ -131,16 +168,17 @@ func (set *patternSet) closure(positions []position) []position {
 	return positions
 }
 
-func (set *patternSet) start() *matchState {
+// Start returns the state before any segment has been consumed.
+func (set *Set) Start() *State {
 	positions := make([]position, len(set.patterns))
 	for index := range set.patterns {
 		positions[index] = position{pattern: int32(index)}
 	}
-	return &matchState{positions: set.closure(positions)}
+	return &State{positions: set.closure(positions)}
 }
 
-// advance consumes one path segment. It returns nil when no pattern can match anymore.
-func (set *patternSet) advance(state *matchState, name string) *matchState {
+// Advance consumes one path segment. It returns nil when no pattern can match anymore.
+func (set *Set) Advance(state *State, name string) *State {
 	var next []position
 	seen := map[position]bool{}
 	add := func(candidate position) {
@@ -166,16 +204,25 @@ func (set *patternSet) advance(state *matchState, name string) *matchState {
 	if len(next) == 0 {
 		return nil
 	}
-	return &matchState{positions: set.closure(next)}
+	return &State{positions: set.closure(next)}
 }
 
-// acceptedRules returns the rules of patterns fully matched by the current path.
-func (set *patternSet) acceptedRules(state *matchState) []int32 {
-	var rules []int32
+// Accepted returns the owners of patterns fully matched by the current path.
+func (set *Set) Accepted(state *State) []int32 {
+	var owners []int32
 	for _, current := range state.positions {
 		if int(current.matched) == len(set.patterns[current.pattern].segments) {
-			rules = append(rules, set.patterns[current.pattern].rule)
+			owners = append(owners, set.patterns[current.pattern].owner)
 		}
 	}
-	return rules
+	return owners
+}
+
+// MatchName reports whether a single name matches a one-segment glob such as "*tax*".
+func MatchName(pattern, name string, caseInsensitive bool) bool {
+	if caseInsensitive {
+		pattern, name = strings.ToLower(pattern), strings.ToLower(name)
+	}
+	matched, _ := path.Match(pattern, name)
+	return matched
 }

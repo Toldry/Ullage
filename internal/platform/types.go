@@ -65,7 +65,10 @@ type DirectoryEntry struct {
 	LogicalBytes   int64
 	// ModifiedUnixNanos is the last write time in nanoseconds since the Unix epoch.
 	ModifiedUnixNanos int64
-	ID                FileID
+	// CreatedUnixNanos is the creation (birth) time, or 0 when the file system does not
+	// record one.
+	CreatedUnixNanos int64
+	ID               FileID
 	// LinkCount is the number of hard links, or 0 when the enumeration cannot report it
 	// cheaply (Windows). Callers must then assume the entry may be hard-linked.
 	LinkCount uint32
@@ -83,6 +86,7 @@ type RootInfo struct {
 	ID                FileID
 	FileSystem        string
 	ModifiedUnixNanos int64
+	CreatedUnixNanos  int64
 }
 
 // Volume describes a mounted volume the user can choose to scan.

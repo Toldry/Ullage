@@ -1,0 +1,25 @@
+id = "adobe-media-cache"
+version = 1
+name = "Adobe media cache"
+what = """\
+  Audio and video preview files that Premiere Pro, After Effects and Media Encoder build \
+  for every clip you import."""
+lost = """\
+  Nothing in your projects. Clips are re-indexed when a project is opened, which takes \
+  time for large projects."""
+regenerable = "yes"
+
+[paths]
+windows = [
+  "{UserProfile}/AppData/Roaming/Adobe/Common/Media Cache Files",
+  "{UserProfile}/AppData/Roaming/Adobe/Common/Media Cache",
+  "{UserProfile}/AppData/Roaming/Adobe/Common/Peak Files",
+]
+
+[[managed_steps]]
+text = """\
+  Premiere Pro: Edit > Preferences > Media Cache > Delete, then choose to delete unused \
+  media cache files."""
+
+[brute_force]
+allowed = true

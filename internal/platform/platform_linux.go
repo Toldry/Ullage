@@ -51,9 +51,23 @@ func (linuxDirectoryReader) ReadDirectory(path string) ([]DirectoryEntry, error)
 			// The entry vanished between listing and stat; it no longer uses space.
 			continue
 		}
-		entries = append(entries, entryFromStat(path, name, &stat, directoryStat.Dev))
+		entry := entryFromStat(path, name, &stat, directoryStat.Dev)
+		entry.CreatedUnixNanos = birthTime(int(directory.Fd()), name)
+		entries = append(entries, entry)
 	}
 	return entries, nil
+}
+
+// birthTime returns the creation time where the file system records one (ext4, btrfs,
+// xfs with statx support), or 0.
+func birthTime(directoryDescriptor int, name string) int64 {
+	var extended unix.Statx_t
+	err := unix.Statx(directoryDescriptor, name, unix.AT_SYMLINK_NOFOLLOW, unix.STATX_BTIME,
+		&extended)
+	if err != nil || extended.Mask&unix.STATX_BTIME == 0 {
+		return 0
+	}
+	return extended.Btime.Sec*1_000_000_000 + int64(extended.Btime.Nsec)
 }
 
 func entryFromStat(parent, name string, stat *unix.Stat_t, parentDevice uint64) DirectoryEntry {
@@ -109,6 +123,7 @@ func DescribeRoot(path string) (RootInfo, error) {
 		ID:                FileID{Volume: stat.Dev, Low: stat.Ino},
 		FileSystem:        fileSystemOf(path),
 		ModifiedUnixNanos: stat.Mtim.Nano(),
+		CreatedUnixNanos:  birthTime(unix.AT_FDCWD, path),
 	}, nil
 }
 

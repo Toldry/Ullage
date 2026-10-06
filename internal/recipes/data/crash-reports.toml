@@ -1,0 +1,24 @@
+id = "crash-reports"
+version = 1
+name = "Crash dumps and error reports"
+what = """\
+  Memory dumps and reports that Windows Error Reporting saves when an app crashes."""
+lost = """\
+  Diagnostic data a developer or support team might ask for. Nothing your apps need to \
+  run."""
+regenerable = "no"
+
+[paths]
+windows = [
+  "{UserProfile}/AppData/Local/CrashDumps",
+  "{UserProfile}/AppData/Local/Microsoft/Windows/WER",
+  "{ProgramData}/Microsoft/Windows/WER/ReportArchive",
+  "{ProgramData}/Microsoft/Windows/WER/ReportQueue",
+]
+
+[[managed_steps]]
+text = "Run Disk Cleanup and select the Windows error report entries."
+command = "cleanmgr.exe"
+
+[brute_force]
+allowed = true

@@ -345,3 +345,43 @@ func TestLargeSparseFilesAreRetainedButCountedAtAllocatedSize(t *testing.T) {
 		t.Fatalf("sparse node = %+v", node)
 	}
 }
+
+func TestCreationTimeAndExtensionMixAreRecorded(t *testing.T) {
+	fileSystem := newFakeFileSystem()
+	root := filepath.Join("/", "r")
+	clips := filepath.Join(root, "clips")
+	for index, name := range []string{"a.MOV", "b.mov", "c.wav", "notes.txt", "README",
+		"weird.name with space"} {
+		entry := file(name, int64(1000*(6-index)))
+		entry.CreatedUnixNanos = int64(index + 1)
+		fileSystem.addEntry(clips, entry)
+	}
+	big := file("render.mp4", 3<<20)
+	big.CreatedUnixNanos = 42
+	fileSystem.addEntry(clips, big)
+
+	result := runScan(t, Options{Roots: []string{root}, Reader: fileSystem})
+	directory := findNode(t, result, clips)
+	want := []ExtensionShare{{"mp4", 3 << 20}, {"mov", 11000}, {"wav", 4000}}
+	if len(directory.Extensions) != 3 {
+		t.Fatalf("extensions = %+v", directory.Extensions)
+	}
+	for index := range want {
+		if directory.Extensions[index] != want[index] {
+			t.Fatalf("extensions = %+v, want %+v", directory.Extensions, want)
+		}
+	}
+	if findNode(t, result, filepath.Join(clips, "render.mp4")).CreatedUnixNanos != 42 {
+		t.Fatalf("creation time not recorded")
+	}
+}
+
+func TestNormalizeExtension(t *testing.T) {
+	cases := map[string]string{"A.PDF": "pdf", "archive.tar.gz": "gz", "README": "",
+		".bashrc": "", "name.with space": "", "x.verylongextension": "", "song.mp3": "mp3"}
+	for name, want := range cases {
+		if got := NormalizeExtension(name); got != want {
+			t.Errorf("NormalizeExtension(%q) = %q, want %q", name, got, want)
+		}
+	}
+}

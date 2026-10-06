@@ -1,0 +1,32 @@
+id = "chat-app-caches"
+version = 1
+name = "Chat and meeting app caches"
+what = """\
+  Cached images, files and web content kept by Microsoft Teams, Slack and Discord to \
+  show conversations faster."""
+lost = """\
+  Nothing on the server. Messages and shared files download again when you open them."""
+regenerable = "yes"
+
+[paths]
+windows = [
+  "{UserProfile}/AppData/Roaming/Microsoft/Teams/Cache",
+  "{UserProfile}/AppData/Roaming/Microsoft/Teams/Service Worker/CacheStorage",
+  "{UserProfile}/AppData/Roaming/Slack/Cache",
+  "{UserProfile}/AppData/Roaming/Slack/Service Worker/CacheStorage",
+  "{UserProfile}/AppData/Roaming/discord/Cache",
+  "{UserProfile}/AppData/Roaming/discord/Code Cache",
+]
+linux = [
+  "{UserProfile}/.config/Slack/Cache",
+  "{UserProfile}/.config/discord/Cache",
+]
+
+[[managed_steps]]
+text = "Quit the app completely (also from the system tray) before clearing its cache."
+
+[[managed_steps]]
+text = "Slack: Help > Troubleshooting > Clear Cache and Restart."
+
+[brute_force]
+allowed = true

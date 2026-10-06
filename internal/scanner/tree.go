@@ -71,6 +71,10 @@ type Node struct {
 	SmallFileCount    int32
 	NotLocalBytes     int64
 	ModifiedUnixNanos int64
+	CreatedUnixNanos  int64
+	// Extensions are the most common file types directly inside a directory, by size.
+	// They help the AI recognize what a folder holds without seeing file names.
+	Extensions []ExtensionShare
 	// SmallFilesModified is the latest write time among the aggregated small files.
 	SmallFilesModified int64
 	ID                 platform.FileID

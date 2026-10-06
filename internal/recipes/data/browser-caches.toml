@@ -1,0 +1,33 @@
+id = "browser-caches"
+version = 1
+name = "Web browser caches"
+what = """\
+  Copies of web pages, images and scripts that Chrome, Edge, Brave and Firefox keep to \
+  load sites faster."""
+lost = """\
+  Nothing you saved. Sites load a little slower until the cache refills. Logins, history \
+  and bookmarks are stored elsewhere and are not touched."""
+regenerable = "yes"
+
+[paths]
+windows = [
+  "{UserProfile}/AppData/Local/Google/Chrome/User Data/*/Cache",
+  "{UserProfile}/AppData/Local/Google/Chrome/User Data/*/Code Cache",
+  "{UserProfile}/AppData/Local/Microsoft/Edge/User Data/*/Cache",
+  "{UserProfile}/AppData/Local/Microsoft/Edge/User Data/*/Code Cache",
+  "{UserProfile}/AppData/Local/BraveSoftware/Brave-Browser/User Data/*/Cache",
+  "{UserProfile}/AppData/Local/BraveSoftware/Brave-Browser/User Data/*/Code Cache",
+  "{UserProfile}/AppData/Local/Mozilla/Firefox/Profiles/*/cache2",
+]
+linux = [
+  "{UserProfile}/.cache/google-chrome",
+  "{UserProfile}/.cache/chromium",
+  "{UserProfile}/.cache/mozilla/firefox/*/cache2",
+]
+
+[[managed_steps]]
+text = """\
+  In the browser, press Ctrl+Shift+Delete and clear only "Cached images and files"."""
+
+[brute_force]
+allowed = true

@@ -165,6 +165,7 @@ func appendParsedEntries(entries []DirectoryEntry, buffer []byte, informationCla
 func parseRecord(record []byte, informationClass uint32, volume uint64) (DirectoryEntry,
 	bool) {
 	little := binary.LittleEndian
+	creation := int64(little.Uint64(record[8:]))
 	lastWrite := int64(little.Uint64(record[24:]))
 	endOfFile := int64(little.Uint64(record[40:]))
 	allocation := int64(little.Uint64(record[48:]))
@@ -195,6 +196,7 @@ func parseRecord(record []byte, informationClass uint32, volume uint64) (Directo
 		AllocatedBytes:    allocation,
 		LogicalBytes:      endOfFile,
 		ModifiedUnixNanos: (lastWrite - windowsToUnixEpochTicks) * 100,
+		CreatedUnixNanos:  (creation - windowsToUnixEpochTicks) * 100,
 		ID:                id,
 		Attributes:        translateAttributes(raw.attributes),
 	}
@@ -307,6 +309,7 @@ type HandleInformation struct {
 	ID                FileID
 	LinkCount         uint32
 	ModifiedUnixNanos int64
+	CreatedUnixNanos  int64
 }
 
 // InspectPath opens path without following links and reports its identity.
@@ -328,6 +331,7 @@ func InspectPath(path string) (HandleInformation, error) {
 		ID:                identity,
 		LinkCount:         basic.NumberOfLinks,
 		ModifiedUnixNanos: basic.LastWriteTime.Nanoseconds(),
+		CreatedUnixNanos:  basic.CreationTime.Nanoseconds(),
 	}, nil
 }
 
@@ -341,6 +345,7 @@ func DescribeRoot(path string) (RootInfo, error) {
 		ID:                information.ID,
 		FileSystem:        fileSystemName(filepath.VolumeName(path) + `\`),
 		ModifiedUnixNanos: information.ModifiedUnixNanos,
+		CreatedUnixNanos:  information.CreatedUnixNanos,
 	}, nil
 }
 
