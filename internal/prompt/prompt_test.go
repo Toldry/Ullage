@@ -10,6 +10,7 @@ import (
 
 	"github.com/toldry/ullage/internal/platform"
 	"github.com/toldry/ullage/internal/redact"
+	"github.com/toldry/ullage/internal/response"
 	"github.com/toldry/ullage/internal/scanner"
 	"github.com/toldry/ullage/internal/scanner/scannertest"
 )
@@ -256,3 +257,18 @@ func TestFormatting(t *testing.T) {
 }
 
 var placeholderLike = regexp.MustCompile(`<R\d+>`)
+
+// The worked example teaches the reply format, so it must itself be a valid reply.
+func TestWorkedExampleParses(t *testing.T) {
+	fixture := newFixture(t, nil)
+	text := Build(fixture.result.Tree, fixture.redactor, "7KQX2M", DefaultOptions).
+		Batches[0].Text
+	start := strings.Index(text, "@SESSION "+exampleSessionCode)
+	end := strings.Index(text, "@END "+exampleSessionCode)
+	example := text[start : end+len("@END "+exampleSessionCode)]
+	result := response.Parse(example, response.Expectation{Code: exampleSessionCode,
+		Batch: 1, BatchCount: 1, FirstID: 1, LastID: 10})
+	if !result.Valid() || len(result.Categories) != 4 {
+		t.Fatalf("worked example does not parse: %+v", result)
+	}
+}
