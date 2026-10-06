@@ -17,6 +17,6 @@ Each conflict below was reported when found.
 | 9 | pagefile.sys, hiberfil.sys and WinSxS listed under System | They are required Known recipes | Known tier | Phase 1 |
 | 10 | Overview says "Last-modified month" leaves the machine | Not in the Phase 3 prompt format at the time | Removed in Phase 1, restored as amendment A-3 added dates | Phase 1 |
 | 11 | Rules file `%LOCALAPPDATA%\Ullage\rules.json` | DPAPI-encrypted in the config directory | `%APPDATA%\Ullage\rules.dpapi` | Phase 2 |
+| 12 | Keyboard: `1-7` steps, `R`, `H`, `T`, `j/k`, `x`, `d` | Not specified | Adopted as designed | Phase 0 |
 | 13 | Redaction review lists small files (88 KB) as rows | Small files are aggregated; their names are never stored or sent (D-010) | Shown as "N small files (names never sent)" (D-032) | Phase 2 |
 | 14 | "Always applied" mentions drive serials | Not applicable: serial numbers are never part of a prompt | Text lists profile, account names, machine name and SIDs | Phase 2 |
-| 12 | Keyboard: `1-7` steps, `R`, `H`, `T`, `j/k`, `x`, `d` | Not specified | Adopted as designed | Phase 0 |

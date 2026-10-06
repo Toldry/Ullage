@@ -272,8 +272,12 @@ function Ledger({ overview }: { overview: Overview }) {
 }
 
 function WhatLeaves() {
-  const sent = ['Paths, after redaction', 'Rounded sizes', 'File counts'];
-  const never = ['File contents: never', 'Username: replaced by ~', 'Machine name: never'];
+  // Dates and file types help the AI judge staleness (amendment A-3). Redacted items are
+  // sent without them.
+  const sent = ['Paths, after redaction', 'Rounded sizes and file counts',
+    'Modified and created month', 'Main file types per folder'];
+  const never = ['File contents: never', 'Username: replaced by ~', 'Machine name: never',
+    'Small file names: never'];
   return (
     <div class="panel leaves">
       <div class="banner-title">What leaves this machine</div>
