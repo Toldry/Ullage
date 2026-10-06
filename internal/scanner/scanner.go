@@ -40,7 +40,8 @@ type Options struct {
 	Reader     platform.DirectoryReader
 	Classifier Classifier
 	Workers    int
-	// RetainFileBytes is the minimum size of a file kept as its own node.
+	// RetainFileBytes is the minimum size (allocated or apparent) of a file kept as its
+	// own node.
 	RetainFileBytes int64
 	// Exclude returns true for directories the user asked never to scan.
 	Exclude func(path string) bool
@@ -378,8 +379,10 @@ func (scan *Scan) processDirectory(job directoryJob) {
 			classification, state = scan.options.Classifier.Child(job.classification,
 				job.state, entry.Name, entry.Kind)
 		}
+		// Apparent size counts too: a large sparse disk image or cloud placeholder is
+		// worth showing even though it occupies little space here.
 		keep := entry.Kind != platform.EntryFile ||
-			entry.AllocatedBytes >= scan.options.RetainFileBytes ||
+			max(entry.AllocatedBytes, entry.LogicalBytes) >= scan.options.RetainFileBytes ||
 			classification != job.classification
 		if keep {
 			retained = append(retained, retainedEntry{entry, classification, state})

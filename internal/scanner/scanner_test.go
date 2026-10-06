@@ -330,3 +330,18 @@ func TestPauseResumeAndCancel(t *testing.T) {
 		t.Fatalf("cancelled scan returned no error")
 	}
 }
+
+func TestLargeSparseFilesAreRetainedButCountedAtAllocatedSize(t *testing.T) {
+	fileSystem := newFakeFileSystem()
+	root := filepath.Join("/", "r")
+	sparse := file("disk.img", 4096)
+	sparse.LogicalBytes = 1 << 30
+	sparse.Attributes = platform.AttributeSparse
+	fileSystem.addEntry(root, sparse)
+
+	result := runScan(t, Options{Roots: []string{root}, Reader: fileSystem})
+	node := findNode(t, result, filepath.Join(root, "disk.img"))
+	if node.TotalBytes() != 4096 || node.OwnLogicalBytes != 1<<30 {
+		t.Fatalf("sparse node = %+v", node)
+	}
+}
