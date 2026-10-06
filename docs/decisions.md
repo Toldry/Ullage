@@ -141,17 +141,21 @@ placeholders, so no descendant reveals anything. An option (on by default) keeps
 list of generic names readable (`build`, `node_modules`, `cache`, `logs`...) so the AI
 can still recognize them. "Name, keep extension" replaces only the item's own name.
 
-### D-027: A redacted name is hidden everywhere it occurs — Reported (Phase 2)
-The leak test requires that a redacted name never appears in any prompt. Every visible
-name containing an explicitly redacted name is therefore redacted too. Names hidden only
-because they sit inside a redacted folder are not propagated, or a hidden `src` would
-redact every `src` on the disk.
+### D-027: A redaction affects only what its mechanism selects — Approved (Phase 2 review)
+Supersedes the first version ("a redacted name is hidden everywhere it occurs"). An item
+picked in the tree (checkbox, exact-path or subtree rule) redacts that item and, with the
+whole-subtree treatment, its descendants; nothing else. Glob and name-anywhere rules
+redact exactly what their pattern matches. An unrelated item with a similar name stays
+visible. The leak test therefore checks each redacted name within that item's own path
+and its descendants' paths (the spec's "including via descendants").
 
-### D-028: Short names match as whole words — Reported (Phase 2)
-Usernames, machine names and redacted names of 4 or more characters are matched as
-case-insensitive substrings. Shorter ones match only as whole words (delimited by
-non-alphanumeric characters or case changes), because a user named "Al" would otherwise
-redact `AppData/Local`. The leak test applies the same threshold.
+### D-028: Short account names match as whole words — Reported, awaiting confirmation
+Applies only to the always-on account and machine names (the old propagation is gone,
+D-027). Names of 4 or more characters match as case-insensitive substrings, as the spec
+asks; shorter ones match only as whole words (split at punctuation and case changes),
+because a user named "Al" would otherwise redact `AppData/Local`. The owner answered
+"same as D-027" for this point; whether that means keeping or dropping this rule for
+account names is an open question.
 
 ### D-029: Always-on redactions — Reported (Phase 2)
 The current profile is rendered as `~`. Other users' profile folders, every local account
@@ -159,23 +163,23 @@ name, the machine name and Windows SIDs are redacted wherever they appear. Names
 contain `<` or `>` (possible on Linux) have those characters replaced so they cannot
 imitate a placeholder.
 
-### D-030: Redacted items carry no metadata — Approved (amendment A-3)
+### D-030: Redacted items carry no metadata except size — Approved (amendment A-3, confirmed in Phase 2 review)
 An item whose own name is redacted is sent with its ID, rounded size and placeholder only:
 no dates, no file count, no file types. Items that are merely inside a redacted folder
 roll up into that folder's line. Implemented in the Phase 3 prompt builder, which reads
 `NodeState.NameHidden()`.
 
-### D-031: Kept extensions are checked too — Reported (Phase 2)
-"Keep extension" keeps a file's extension only when the extension is a normal one (up to
-10 letters or digits) and contains no account name, machine name or redacted name;
-otherwise the whole name becomes a placeholder. Found while writing the engine:
-`notes.mara` would otherwise leak the user name "mara".
+### D-031: Extensions are never sensitive — Approved (Phase 2 review)
+Supersedes the first version, which dropped an extension that contained a sensitive word.
+"Name, keep extension" always keeps a normal extension (up to 10 letters or digits). An
+extension that is not normal (spaces, symbols, longer) is treated as part of the name.
 
-### D-032: Small files are never listed individually — Reported (Phase 2)
+### D-032: Small files are never listed individually — Approved (Phase 2 review)
 Files under 1 MiB are aggregated (D-010), so the redaction review shows them as "N small
 files (names never sent)" instead of one row per file. The design shows an 88 KB file as
 its own row; such a file's name cannot leave the machine at all, so there is nothing to
-redact.
+redact. Approved: only a folder whose collection of small files is large enough to be
+worth examining reaches the prompt, as one line (Phase 3 rollup).
 
 ### D-033: Unreadable rules are moved aside only on explicit confirmation — Reported (Phase 2)
 While the rules file is unreadable, every redaction operation fails and nothing writes to

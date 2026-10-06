@@ -259,3 +259,14 @@ redact their metadata entirely.
 
 Keep `ARCHITECTURE.md` in `docs/`, together with the plans and decisions reached in the
 conversation, in appropriate Markdown files.
+
+### A-5 (Phase 2 review): redaction scope, extensions, small files
+
+- Redacted items keep their rounded size; all other metadata is dropped (D-030).
+- A redaction affects only what its mechanism selects: an item picked in the tree
+  affects that item (and its subtree); a glob or name pattern affects what it matches.
+  There is no implicit hiding of similar names elsewhere (D-027). The leak test's
+  "including via descendants" is checked within each redacted item's subtree.
+- Extensions do not need to be hidden or redacted (D-031).
+- Small files never reach the prompt individually. Only a folder holding a collection of
+  small files large enough to be worth examining appears, as one line (D-032; Phase 3).

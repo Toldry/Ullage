@@ -123,7 +123,7 @@ export interface Overview {
 
 // Redaction (internal/session/redaction.go)
 export type RedactionDecision = 'visible' | 'home' | 'hidden' | 'subtree' | 'keep-extension';
-export type RedactionSource = '' | 'rule' | 'session' | 'always' | 'same-name' | 'ancestor';
+export type RedactionSource = '' | 'rule' | 'session' | 'always' | 'ancestor';
 
 export interface RedactionSummary {
   available: boolean;

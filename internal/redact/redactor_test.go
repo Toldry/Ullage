@@ -86,7 +86,7 @@ func TestAlwaysOnRedactions(t *testing.T) {
 		{"/data/$Recycle.Bin/S-1-5-21-3623811015-3361044348-30300820-1013/x.bin",
 			`^/data/\$Recycle\.Bin/<R\d+>/x\.bin$`},
 		{"/data/Users/mara/odd/x.mara",
-			`^/data/Users/~/odd/<R\d+>$`},
+			`^/data/Users/~/odd/<R\d+>\.mara$`},
 	}
 	for _, entry := range redactedNames {
 		path, pattern := entry.path, entry.pattern
@@ -114,10 +114,12 @@ func TestSubtreeRuleHidesEveryNameButWellKnownOnes(t *testing.T) {
 		strings.Contains(source, "acme") {
 		t.Errorf("hidden subtree leaked a name: %s", source)
 	}
-	propagated := fixture.render(t, redactor,
+	// Selecting an item redacts that item only; an unrelated folder with a similar name
+	// stays visible (decision D-027, revised).
+	unrelated := fixture.render(t, redactor,
 		"/data/Users/mara/projects/other/old-acme-site/x.bin")
-	if strings.Contains(strings.ToLower(propagated), "acme") {
-		t.Errorf("redacted name leaked through another folder: %s", propagated)
+	if unrelated != "/data/Users/~/projects/other/old-acme-site/x.bin" {
+		t.Errorf("unrelated folder was redacted: %s", unrelated)
 	}
 	match := redactor.Matches()[0]
 	if len(match.Nodes) != 1 || match.Bytes != 2*megabyte {
@@ -274,24 +276,6 @@ func TestShortWordsMatchWholeWordsOnly(t *testing.T) {
 	for _, testCase := range cases {
 		if got := containsSensitive(testCase.name, testCase.word); got != testCase.want {
 			t.Errorf("containsSensitive(%q, %q) = %v", testCase.name, testCase.word, got)
-		}
-	}
-}
-
-func TestNameMatcherAgreesWithDirectComparison(t *testing.T) {
-	names := []string{"acme", "acme-corp", "corp", "al", "tax-2025", "he", "shers", "hers"}
-	matcher := newNameMatcher(names)
-	candidates := []string{"old-acme-site", "ACME", "Local", "al-notes", "ushers", "hehe",
-		"corporate", "x", "my he file", "tax-2025.pdf", "taxes", "cor"}
-	for _, candidate := range candidates {
-		want := false
-		for _, name := range names {
-			if containsSensitive(candidate, name) {
-				want = true
-			}
-		}
-		if got := matcher.matches(candidate); got != want {
-			t.Errorf("matches(%q) = %v, want %v", candidate, got, want)
 		}
 	}
 }

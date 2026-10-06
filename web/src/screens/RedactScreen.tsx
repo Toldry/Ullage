@@ -329,7 +329,7 @@ function TreeRow(props: {
     );
   }
   const locked = item.source === 'always' || item.source === 'ancestor' ||
-    item.source === 'same-name' || item.decision === 'home';
+    item.decision === 'home';
   return (
     <div class={`redact-row${props.selected ? ' selected' : ''}`} onClick={props.onSelect}>
       <span class="redact-name" style={indent}>
@@ -390,7 +390,7 @@ function Inspector(props: {
   }
   const item = detail.item;
   const locked = item.source === 'always' || item.source === 'ancestor' ||
-    item.source === 'same-name' || item.decision === 'home';
+    item.decision === 'home';
   const current = item.decision === 'subtree' ? 'subtree'
     : item.decision === 'keep-extension' ? 'keep-extension' : 'none';
   const modes = [
@@ -429,10 +429,8 @@ function Inspector(props: {
             {item.decision === 'home' ? 'Your profile folder is always exported as ~.'
               : item.source === 'ancestor' ? 'A folder above this one is redacted with its ' +
                 'whole subtree. Change the treatment there.'
-                : item.source === 'same-name' ? 'This name contains a name you redacted ' +
-                  'elsewhere, so it is hidden too.'
-                  : 'This name contains an account name, the machine name or a Windows SID. ' +
-                    'It is always redacted.'}
+                : 'This name contains an account name, the machine name or a Windows SID. ' +
+                  'It is always redacted.'}
           </div>
         ) : (
           modes.map((mode) => (

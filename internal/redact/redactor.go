@@ -2,7 +2,6 @@ package redact
 
 import (
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/toldry/ullage/internal/pathpattern"
@@ -33,7 +32,6 @@ const (
 	SourceRule
 	SourceSession
 	SourceAlways
-	SourceSameName
 	SourceAncestor
 )
 
@@ -101,8 +99,6 @@ type Redactor struct {
 	registry    *Registry
 	states      []NodeState
 	matches     []RuleMatch
-	sameNames   []string
-	sameNameSet *nameMatcher
 	profileKeys []string
 }
 
@@ -125,7 +121,6 @@ func New(options Options) *Redactor {
 	patterns, nameRules := redactor.compileRules()
 	anchored := redactor.findAnchoredNodes()
 	redactor.decide(patterns, nameRules, anchored, options.Overrides)
-	redactor.propagateRedactedNames()
 	return redactor
 }
 
@@ -339,50 +334,6 @@ func (redactor *Redactor) containsAlwaysRedacted(name string) bool {
 	return false
 }
 
-// propagateRedactedNames redacts every visible name that contains a name the user chose
-// to redact, so a redacted name never appears anywhere (decision D-027). It only looks
-// at nodes that hold Unknown-tier bytes, the only ones rendered into prompts.
-func (redactor *Redactor) propagateRedactedNames() {
-	seen := map[string]bool{}
-	redactor.tree.Walk(func(index scanner.NodeIndex, node *scanner.Node) {
-		state := redactor.states[index]
-		if state.Source != SourceRule && state.Source != SourceSession {
-			return
-		}
-		var key string
-		switch state.Decision {
-		case DecisionRedacted:
-			key = node.Name
-		case DecisionRedactedKeepExtension:
-			key = stem(node.Name)
-		default:
-			return
-		}
-		if lower := strings.ToLower(key); key != "" && !seen[lower] {
-			seen[lower] = true
-			redactor.sameNames = append(redactor.sameNames, key)
-		}
-	})
-	sort.Strings(redactor.sameNames)
-	if len(redactor.sameNames) == 0 {
-		return
-	}
-	redactor.sameNameSet = newNameMatcher(redactor.sameNames)
-	redactor.tree.Walk(func(index scanner.NodeIndex, node *scanner.Node) {
-		state := &redactor.states[index]
-		if state.Decision != DecisionVisible || node.TierBytes(scanner.TierUnknown) == 0 {
-			return
-		}
-		if redactor.containsSameName(node.Name) {
-			*state = applyTreatment(TreatmentKeepExtension, false, SourceSameName, -1)
-		}
-	})
-}
-
-func (redactor *Redactor) containsSameName(name string) bool {
-	return redactor.sameNameSet.matches(name)
-}
-
 // State returns the decision for a node.
 func (redactor *Redactor) State(index scanner.NodeIndex) NodeState {
 	return redactor.states[index]
@@ -391,12 +342,6 @@ func (redactor *Redactor) State(index scanner.NodeIndex) NodeState {
 // Matches returns what each rule matched, in rule order.
 func (redactor *Redactor) Matches() []RuleMatch {
 	return redactor.matches
-}
-
-// RedactedNames lists names that are hidden everywhere because the user redacted them.
-// Local use only (the leak test and the UI); never put this in a prompt.
-func (redactor *Redactor) RedactedNames() []string {
-	return append([]string(nil), redactor.sameNames...)
 }
 
 // Render returns the path of a node as it may appear in a prompt: forward slashes, ~ for
@@ -442,7 +387,7 @@ func (redactor *Redactor) renderName(index scanner.NodeIndex, node *scanner.Node
 		return "~"
 	case DecisionHidden:
 		if state.keepWellKnownBelow && isWellKnown(node.Name) &&
-			!redactor.containsAlwaysRedacted(node.Name) && !redactor.containsSameName(node.Name) {
+			!redactor.containsAlwaysRedacted(node.Name) {
 			return sanitize(node.Name)
 		}
 		return redactor.registry.Placeholder(node.Name)
@@ -459,10 +404,9 @@ func (redactor *Redactor) placeholderKeepingExtension(node *scanner.Node) string
 	if node.Kind != platform.EntryFile {
 		return redactor.registry.Placeholder(node.Name)
 	}
+	// Extensions are never treated as sensitive (decision D-031).
 	extension := scanner.NormalizeExtension(node.Name)
-	// An extension is kept only when it reveals nothing sensitive itself.
-	if extension == "" || redactor.containsAlwaysRedacted(extension) ||
-		redactor.containsSameName(extension) {
+	if extension == "" {
 		return redactor.registry.Placeholder(node.Name)
 	}
 	return redactor.registry.Placeholder(stem(node.Name)) + "." + extension
@@ -483,7 +427,7 @@ func (redactor *Redactor) renderRoot(rootIndex scanner.NodeIndex) []string {
 			rendered = append(rendered, strings.ToUpper(segment[:1])+":")
 		case redactor.isProfileSegment(segments, position):
 			rendered = append(rendered, "~")
-		case redactor.containsAlwaysRedacted(segment) || redactor.containsSameName(segment):
+		case redactor.containsAlwaysRedacted(segment):
 			rendered = append(rendered, redactor.registry.Placeholder(segment))
 		default:
 			rendered = append(rendered, sanitize(segment))

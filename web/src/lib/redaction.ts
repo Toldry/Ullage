@@ -69,8 +69,6 @@ export function reasonText(item: RedactionItem): string {
       return 'you · this session';
     case 'always':
       return 'always: account, machine name or SID';
-    case 'same-name':
-      return 'contains a redacted name';
     case 'ancestor':
       return 'parent is redacted';
     default:

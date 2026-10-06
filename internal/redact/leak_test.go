@@ -3,6 +3,7 @@ package redact
 import (
 	"math/rand"
 	"path"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -10,9 +11,12 @@ import (
 	"github.com/toldry/ullage/internal/scanner/scannertest"
 )
 
-// The required redaction leak test: for every redacted item, no rendered path may contain
-// its original name (case-insensitive), including through descendants, and the username
-// and machine name never appear. Phase 3 runs the same assertions on complete prompts.
+// The required redaction leak test: for every redacted item, neither its own rendered path
+// nor any descendant's may contain its original name (case-insensitive), and the username,
+// machine name and SIDs never appear anywhere. A redacted item affects only itself and
+// its subtree, so an unrelated item with a similar name may stay visible (D-027).
+// Extensions are not sensitive (D-031), so a kept extension is not checked.
+// Phase 3 runs the same assertions on complete prompts.
 
 var leakVocabulary = []string{"projects", "acme", "acme-corp", "build", "src", "tax-2025",
 	"client-northwind", "notes", "photos", "case-114", "DESKTOP-ZX81", "mara", "MaraPhotos",
@@ -70,47 +74,43 @@ func TestRedactionLeak(t *testing.T) {
 			rendered[index] = redactor.Render(index)
 		})
 
-		secretSet := map[string]bool{}
 		tree.Walk(func(index scanner.NodeIndex, node *scanner.Node) {
 			state := redactor.State(index)
-			explicit := state.Source == SourceRule || state.Source == SourceSession
-			// In keep-extension mode the extension is public by design; the secret is the
-			// rest of the name.
+			var secret string
 			switch {
-			case explicit && state.Decision == DecisionRedacted:
-				secretSet[strings.ToLower(node.Name)] = true
-			case explicit && state.Decision == DecisionRedactedKeepExtension:
-				secretSet[strings.ToLower(stem(node.Name))] = true
-			}
-			if state.Decision == DecisionHidden && !placeholderPattern.MatchString(
-				redactor.RenderName(index)) {
+			case state.Decision == DecisionRedacted:
+				secret = node.Name
+			case state.Decision == DecisionRedactedKeepExtension:
+				secret = stem(node.Name)
+			case state.Decision == DecisionHidden && placeholderPattern.MatchString(
+				redactor.RenderName(index)):
+				secret = stem(node.Name)
+			default:
 				return
 			}
-			if state.Decision == DecisionHidden {
-				// A hidden name must not show anywhere inside its redacted subtree.
-				for descendant := range descendantsOf(tree, index) {
-					mustNotAppear(t, rendered[descendant], node.Name, "hidden name")
-				}
+			// Ancestors are other items and may legitimately share the name, so only the
+			// part of each path from this item downward is checked.
+			depth := strings.Count(rendered[index], "/")
+			for descendant := range descendantsOf(tree, index) {
+				segments := strings.Split(withoutKeptExtension(rendered[descendant]), "/")
+				mustNotAppear(t, strings.Join(segments[depth:], "/"), secret, "redacted name")
 			}
 		})
-		var secrets []string
-		for secret := range secretSet {
-			secrets = append(secrets, secret)
-		}
-		if len(secrets) == 0 {
-			t.Fatalf("seed %d: fixture produced no redactions", seed)
-		}
 		sensitive := append([]string{"S-1-5-21-111-222-333-1001"},
 			testContext().SensitiveWords...)
 		for _, line := range rendered {
-			for _, secret := range secrets {
-				mustNotAppear(t, line, secret, "redacted name")
-			}
 			for _, word := range sensitive {
-				mustNotAppear(t, line, word, "account or machine name")
+				mustNotAppear(t, withoutKeptExtension(line), word, "account or machine name")
 			}
 		}
 	}
+}
+
+var keptExtension = regexp.MustCompile(`(<R\d+>)\.[a-z0-9]+(/|$)`)
+
+// withoutKeptExtension drops extensions kept after placeholders, which are allowed.
+func withoutKeptExtension(rendered string) string {
+	return keptExtension.ReplaceAllString(rendered, "$1$2")
 }
 
 func descendantsOf(tree *scanner.Tree, index scanner.NodeIndex) map[scanner.NodeIndex]bool {

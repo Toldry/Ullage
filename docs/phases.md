@@ -56,8 +56,8 @@ Built:
 - `redact`: rule types exact, subtree, glob and name-anywhere; treatments whole subtree
   (with the well-known-names option) and keep extension; file-ID anchors that follow
   renames; always-on redaction of the profile (~), account names, machine name and SIDs;
-  redacted names hidden wherever they occur; placeholders persisted encrypted
-  (D-025 to D-031, D-034). Aho-Corasick matching keeps propagation linear.
+  placeholders persisted encrypted (D-025 to D-031, D-034). After review, a redaction
+  affects only what its mechanism selects (D-027).
 - Session and API: redaction summary, lazily loaded review tree, item detail with a
   prompt preview, session overrides, rules with match counts, fail-closed handling of an
   unreadable rules file (D-033).
@@ -66,9 +66,9 @@ Built:
 Tested:
 
 - Required leak test: randomized trees (5 seeds, 1,500 files each) with redacted names,
-  user and machine names, SIDs and short names; asserts no rendered path contains a
-  redacted name, a hidden name inside its subtree, an account name or the machine name.
-  Verified to fail when propagation or the always-on check is disabled.
+  user and machine names, SIDs and short names; asserts no redacted name appears in its
+  own path or its descendants', and no account name, machine name or SID appears
+  anywhere. Verified to fail when subtree hiding or the always-on check is disabled.
 - Rule semantics, session overrides, rename-following, placeholder stability, sanitizing
   of names that imitate placeholders, short-word matching.
 - Encrypted store: round trip, no plaintext on disk, fail closed on tampered, foreign,
@@ -80,6 +80,9 @@ Tested:
   violations or remote requests.
 
 Deviations reported: D-026 to D-034; design conflicts 11, 13 and 14.
+
+Review outcome: D-030 and D-032 approved; D-027 and D-031 revised and implemented
+(amendment A-5); D-028 awaiting confirmation.
 
 ## Phase 2 scope (as planned)
 
