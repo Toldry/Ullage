@@ -4,9 +4,8 @@ Ullage is a Windows-only, privacy-first disk space analyzer for developers. A lo
 scans drives, serves a browser UI on `127.0.0.1`, and uses AI only through manual copy-paste.
 The program never makes an outbound network connection.
 
-This document is the Phase 0 deliverable: stack choice, rejected alternatives, module
-layout, data flow, storage locations, and the points where the design export conflicts with
-the behavioral spec.
+This document describes the stack, module layout, data flow and storage locations. It
+started as the Phase 0 deliverable and is kept current as phases land.
 
 ---
 
@@ -116,40 +115,42 @@ decision below may assume Windows outside one boundary:
 
 ```
 ullage/
-├── cmd/
-│   ├── ullage/              main: single-instance check, start server, open browser
-│   └── tokenestimate/       DEV-ONLY token count estimator (never in release build)
+├── cmd/ullage/              main: start server, open browser, idle shutdown
 ├── internal/
-│   ├── winapi/              thin Win32 bindings (build tag: windows) + fakes for tests
-│   ├── scanner/             parallel walker, size accounting, hard-link dedup, progress
-│   ├── volume/              volume info, serial numbers, free space, root normalization
-│   ├── tiers/               System / Known / Unknown classification
-│   ├── recipes/             recipe schema, loader, matcher; recipes/*.toml embedded
-│   ├── apps/                installed applications from registry Uninstall keys
-│   ├── redact/              rules, matcher, placeholder allocation, rendering
-│   ├── protect/             DPAPI wrapper; fail-closed encrypted file store
-│   ├── prompt/              aggregation, ID assignment, tree layout, batching, text
-│   ├── response/            tolerant extractor, strict validator, repair prompts
-│   ├── results/             merging recipe and AI categories, explanation queue
-│   ├── deletion/            guard rails, re-verification, Recycle Bin/permanent delete
-│   ├── history/             session history store
-│   ├── session/             per-launch state: scan, ID map, batches, session code
-│   ├── server/              HTTP handlers, token/Host/Origin middleware, SSE progress
-│   ├── safelog/             logger that only accepts redaction-rendered paths
-│   └── storage/             config directory resolution, atomic file writes
-├── web/
-│   ├── src/                 Preact + TS screens, components, theme tokens
-│   ├── fonts/               IBM Plex .woff2 + OFL license
-│   └── dist/                build output (git-ignored), embedded by internal/server
-├── tools/
-│   └── nonetwork/           build check: forbids outbound network APIs (see §6)
-├── testdata/                parser fixtures, injection file names, sample scan
-└── .github/workflows/       Windows CI: build, go test, vitest, no-network checks
+│   ├── platform/            the only OS-specific code (*_windows.go, *_linux.go)
+│   ├── scanner/             parallel walker, sizes, hard links, dates, file-type mix
+│   ├── pathpattern/         segment-wise glob engine shared by tiers and redaction
+│   ├── recipes/             recipe schema and validation; data/*.toml embedded
+│   ├── tiers/               System / Known / Unknown classification during the walk
+│   ├── overview/            numbers for the Overview screen
+│   ├── protect/             secret storage (DPAPI on Windows), fail closed
+│   ├── redact/              redaction rules, placeholders, path rendering
+│   ├── session/             per-launch state: scan, session code, log, redaction
+│   ├── server/              HTTP handlers, token/Host/Origin guard, SSE progress
+│   ├── storage/             config file, atomic writes
+│   └── nonetwork/           runtime guard that disables outbound HTTP and DNS
+│   (later phases add prompt/, response/, results/, deletion/, history/)
+├── web/                     Preact + TypeScript UI; dist/ is embedded by package web
+├── tools/nonetwork/         build check: forbids outbound network APIs (see §6)
+├── docs/                    this file, requirements, decisions, phase plan
+└── .github/workflows/       CI on Windows and Linux
 ```
 
 Rules for dependencies between packages: `prompt` and `response` never import `deletion`;
-`deletion` accepts only `scanner.ItemID` values resolved through `session`, never paths or
-strings derived from AI text. This makes safety rule 3 structural rather than a convention.
+`deletion` accepts only scan item IDs resolved through `session`, never paths or strings
+derived from AI text. This makes safety rule 3 structural rather than a convention.
+
+## 2.1 AI-first categorization
+
+Recipes are an optimization, not the classifier. They pre-claim a short list of items
+whose meaning is certain and that need no AI (page file, WinSxS, package caches, browser
+caches...). Everything else is the Unknown tier, which the AI categorizes with free-text
+category names, so categories are never limited to a fixed list and work for any user: a
+video editor's render caches, a lawyer's archived case folders, a streamer's raw
+recordings, or a family photo library. To make that possible the prompt carries, besides
+the redacted path and rounded size, the newest modification month, the creation month
+and the dominant file types of each line, and its instructions are written for a general
+audience rather than for developers (see decision D-012).
 
 ---
 
@@ -286,60 +287,35 @@ All under the current user's profile. Nothing is written next to the executable.
 
 ---
 
-## 8. Key design notes for later phases
+## 8. Key design notes
 
-- **Hard links.** The spec says "deduplicate by (volume serial, file ID) when link count > 1".
-  Getting the link count requires opening every file, which roughly doubles scan time. I plan
-  an equivalent approach: the directory enumeration already returns each file's ID, so I keep a
-  per-volume set of seen IDs and count each ID once. A file with link count 1 can never be seen
-  twice, so the totals are identical. Memory cost is about 32 bytes per file (about 100 MB at
-  3 million files). `GetFileInformationByHandle` is still used for directories, roots,
-  redaction rule anchoring, and pre-deletion re-checks. **Needs your approval** as it departs
-  from the letter of the spec.
-- **Reparse points.** Only `IO_REPARSE_TAG_MOUNT_POINT` (junctions, mounted volumes) and
-  `IO_REPARSE_TAG_SYMLINK` are treated as links (recorded, size 0, target shown, never
-  traversed). Cloud Files (`IO_REPARSE_TAG_CLOUD_*`), deduplication, and WOF-compressed files
-  are also reparse points but are real files and must be sized, not skipped.
-- **Compressed and sparse files.** The directory entry's `AllocationSize` is used, and for
-  entries with `COMPRESSED` or `SPARSE_FILE` attributes it is confirmed with
-  `GetCompressedFileSizeW`.
-- **Unreadable space.** When not elevated, volume "used" minus scanned bytes is shown as an
-  "unaccounted" band. It is not a fourth tier, since those bytes were never scanned.
+- **Hard links.** Counted once per (volume, file ID). Windows directory enumeration does not
+  report link counts, so every file ID is tracked; a file with one link can never be seen
+  twice, so totals equal "deduplicate when link count > 1" (decision D-004). The owner of
+  shared bytes is the sighting with the smallest path, which keeps totals deterministic.
+- **Reparse points.** Only mount points (junctions, mounted volumes) and symbolic links are
+  links: recorded at size 0 with their target, never traversed. Cloud Files, deduplicated
+  and WOF-compressed files are also reparse points but are real files and are sized.
+- **Compressed and sparse files.** The directory entry's allocation is used, confirmed with
+  `GetCompressedFileSizeW` for compressed, sparse, WOF and deduplicated files.
+- **Small files.** Files below 1 MiB (allocated and apparent) are aggregated into their
+  folder's counters; their names are never stored and therefore never leave the machine.
+- **Dates.** Every node records modification and creation time. Last access time is not
+  used: Windows updates it lazily or not at all, so it would mislead staleness judgments.
+- **Unaccounted space.** Volume "used" minus scanned bytes. It is not a tier, since those
+  bytes were never scanned (decision D-008).
 - **Recycle Bin and long paths.** The shell cannot recycle some paths longer than 260
-  characters. Such items are reported as "cannot recycle", and the user may choose permanent
+  characters. Such items are reported as "cannot recycle"; the user may choose permanent
   deletion with the extra confirmation. They are never silently deleted permanently.
-- **Testing.** The development container is Linux. Pure logic (prompt, parser, redaction
-  rendering, guards with a fake filesystem) runs anywhere. Win32 fixtures (junctions, hard
-  links, sparse, compressed, long paths, ACL-denied folders, DPAPI, Recycle Bin) run on a
+- **Testing.** Pure logic runs on any OS. Win32 fixtures (junctions, hard links, sparse,
+  compressed, long paths, ACL-denied folders, DPAPI, Recycle Bin) run on a
   `windows-latest` GitHub Actions runner, which is the source of truth for each phase.
 
 ---
 
-## 9. Conflicts between the design export and this spec
+## 9. Related documents
 
-The spec wins in each case. I will implement the spec's version unless you say otherwise.
-
-| # | Design export                                                        | Spec / safety rule               | Resolution |
-|---|----------------------------------------------------------------------|----------------------------------|-----------|
-| 1 | Loads IBM Plex from `fonts.googleapis.com`                           | Rule 1: no remote assets         | Bundle Plex `.woff2` locally |
-| 2 | `support.js` loads React from `unpkg.com`                            | Rule 1                            | Design runtime is not shipped; Preact bundled |
-| 3 | Placeholders shown as `<REDACTED_3>`                                 | Placeholders are `<R{n}>`        | Use `<R3>`, `<R3>.ext` |
-| 4 | Session code `7F3K-Q2MD`                                             | `@SESSION 7KQX2M` (6 chars)      | 6 characters, unambiguous alphabet (no `0/O/1/I`) |
-| 5 | Prompt asks for a fenced **JSON** reply; parser checks "Schema ullage/v1" | Pipe-delimited table between `@SESSION` and `@END` | Pipe format |
-| 6 | Repair prompts ask to "resend ONLY the broken categories" and keep valid ones | "asking for the full corrected response only" | Full response; nothing partially imported. The UI still shows which rows were valid |
-| 7 | Item IDs like `i713`                                                 | Plain integers and ranges        | Plain integers |
-| 8 | Partial scan shows an "Unreadable" tier                              | Every scanned byte in exactly one of three tiers | Shown as "unaccounted", not a tier (see §8) |
-| 9 | Keyboard: `1-7` steps, `R`, `H`, `T`, `j/k`, `x`, `d`                 | Not specified                     | Adopted as designed |
-
----
-
-## 10. Phase plan
-
-| Phase | Deliverable | Test focus |
-|-------|-------------|------------|
-| 1 | Scanner, tiers, recipes (TOML), server skeleton with hardening, scan + overview screens | Scanner fixtures, localhost security, no-network checks |
-| 2 | Redaction engine, DPAPI store, rules manager screen | Leak test, fail-closed test, rename-following |
-| 3 | Prompt builder, parser, validator, repair prompts, export + paste screens | Parser fixtures, injection, token estimator script |
-| 4 | Results screen, Round B explanations, low-confidence gating | Merge/sort, Round B parser |
-| 5 | Deletion pipeline and confirmation screen | Guard refusals, change detection, partial failures |
-| 6 | History, themes, shortcuts, all states, packaging, Start menu shortcut, README | End-to-end on Windows CI |
+- [requirements.md](requirements.md): the specification and later amendments.
+- [decisions.md](decisions.md): every decision with its reason and status.
+- [design-conflicts.md](design-conflicts.md): where the design export and the spec disagree.
+- [phases.md](phases.md): the phase plan and what each completed phase delivered.

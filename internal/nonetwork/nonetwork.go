@@ -1,5 +1,5 @@
 // Package nonetwork disables Go's outbound networking defaults at runtime. It is one of
-// several layers enforcing "no outbound connections"; see ARCHITECTURE.md §6.
+// several layers enforcing "no outbound connections"; see docs/ARCHITECTURE.md §6.
 package nonetwork
 
 import (

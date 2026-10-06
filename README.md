@@ -1,10 +1,12 @@
 # Ullage
 
-A Windows-only, privacy-first disk space analyzer for developers. It scans drives locally,
+A Windows-only, privacy-first disk space analyzer for everyone. It scans drives locally,
 serves its UI on `127.0.0.1`, and uses AI only through manual copy and paste. The program
 itself never makes an outbound network connection.
 
-Status: under construction, phase by phase. See [ARCHITECTURE.md](ARCHITECTURE.md).
+Status: under construction, phase by phase. See [docs/](docs/):
+[architecture](docs/ARCHITECTURE.md), [requirements](docs/requirements.md),
+[decisions](docs/decisions.md) and the [phase plan](docs/phases.md).
 
 ## Building
 
