@@ -162,7 +162,33 @@ imitate a placeholder.
 ### D-030: Redacted items carry no metadata — Approved (amendment A-3)
 An item whose own name is redacted is sent with its ID, rounded size and placeholder only:
 no dates, no file count, no file types. Items that are merely inside a redacted folder
-roll up into that folder's line.
+roll up into that folder's line. Implemented in the Phase 3 prompt builder, which reads
+`NodeState.NameHidden()`.
+
+### D-031: Kept extensions are checked too — Reported (Phase 2)
+"Keep extension" keeps a file's extension only when the extension is a normal one (up to
+10 letters or digits) and contains no account name, machine name or redacted name;
+otherwise the whole name becomes a placeholder. Found while writing the engine:
+`notes.mara` would otherwise leak the user name "mara".
+
+### D-032: Small files are never listed individually — Reported (Phase 2)
+Files under 1 MiB are aggregated (D-010), so the redaction review shows them as "N small
+files (names never sent)" instead of one row per file. The design shows an 88 KB file as
+its own row; such a file's name cannot leave the machine at all, so there is nothing to
+redact.
+
+### D-033: Unreadable rules are moved aside only on explicit confirmation — Reported (Phase 2)
+While the rules file is unreadable, every redaction operation fails and nothing writes to
+the file. The user can choose "Move it aside and start over" (a two-step button; the API
+requires the literal confirmation `reset`), which renames the file to
+`rules.dpapi.unreadable-<timestamp>` so it can still be recovered, for example by copying
+it back to the Windows account that created it.
+
+### D-034: Placeholder numbers are global and persisted — Reported (Phase 2)
+One registry maps names to numbers for all scans, saved in the encrypted rules file, so
+`<R3>` stays the same folder in later sessions and the AI can correlate items across
+batches. Names hidden inside a redacted subtree get numbers too; the registry never
+leaves the PC.
 
 ## Presentation
 
