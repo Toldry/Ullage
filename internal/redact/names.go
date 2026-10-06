@@ -78,13 +78,15 @@ func isWellKnown(name string) bool {
 
 // sanitize makes a visible name safe to embed: it cannot imitate a placeholder or break
 // the one-line-per-item format. '<', '>' and '|' never occur in Windows names but can on
-// Linux; control characters can occur on both.
+// Linux; control characters can occur on both. Invisible format characters (bidi
+// overrides such as U+202E, zero-width spaces) are replaced too, because they can make a
+// name display differently from what it is.
 func sanitize(name string) string {
 	return strings.Map(func(character rune) rune {
 		switch {
 		case character == '<' || character == '>' || character == '|':
 			return '_'
-		case unicode.IsControl(character):
+		case unicode.IsControl(character) || unicode.Is(unicode.Cf, character):
 			return '_'
 		default:
 			return character

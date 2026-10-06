@@ -380,6 +380,12 @@ func (redactor *Redactor) RenderName(index scanner.NodeIndex) string {
 	return redactor.renderName(index, node)
 }
 
+// NameShown reports whether the node's own name appears as-is in prompts, which is what
+// decides whether its metadata may be sent (decision D-030).
+func (redactor *Redactor) NameShown(index scanner.NodeIndex) bool {
+	return !strings.HasPrefix(redactor.RenderName(index), "<R")
+}
+
 func (redactor *Redactor) renderName(index scanner.NodeIndex, node *scanner.Node) string {
 	state := redactor.states[index]
 	switch state.Decision {

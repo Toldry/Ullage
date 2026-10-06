@@ -7,8 +7,8 @@ for review. Status is updated as phases land.
 |-------|-------------|------------|--------|
 | 0 | Stack, architecture, plan | — | Done, approved |
 | 1 | Scanner, tiers, recipes, hardened server, Scan and Overview screens | Scanner fixtures, localhost security, no-network checks | Done, reviewed |
-| 2 | Redaction engine, encrypted rules store, redaction review and rules screens; dates, file types and non-developer recipes | Leak test, fail-closed test, rename-following | Done, awaiting review |
-| 3 | Prompt builder, parser, validator, repair prompts, Export and Paste screens | Parser fixtures, injection, token estimator | Planned |
+| 2 | Redaction engine, encrypted rules store, redaction review and rules screens; dates, file types and non-developer recipes | Leak test, fail-closed test, rename-following | Done, approved |
+| 3 | Prompt builder, parser, validator, repair prompts, Export and Paste screens | Parser fixtures, injection, token estimator | In progress |
 | 4 | Results screen, round B explanations, low-confidence gating | Merge and sort, round B parser | Planned |
 | 5 | Deletion pipeline and confirmation screen | Guard refusals, change detection, partial failures | Planned |
 | 6 | History, all design states, packaging, Start menu shortcut, README | End-to-end on Windows CI | Planned |
@@ -82,7 +82,7 @@ Tested:
 Deviations reported: D-026 to D-034; design conflicts 11, 13 and 14.
 
 Review outcome: D-030 and D-032 approved; D-027 and D-031 revised and implemented
-(amendment A-5); D-028 awaiting confirmation.
+(amendment A-5); D-028 approved.
 
 ## Phase 2 scope (as planned)
 

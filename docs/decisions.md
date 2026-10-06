@@ -149,13 +149,12 @@ redact exactly what their pattern matches. An unrelated item with a similar name
 visible. The leak test therefore checks each redacted name within that item's own path
 and its descendants' paths (the spec's "including via descendants").
 
-### D-028: Short account names match as whole words — Reported, awaiting confirmation
+### D-028: Short account names match as whole words — Approved (Phase 2 review)
 Applies only to the always-on account and machine names (the old propagation is gone,
 D-027). Names of 4 or more characters match as case-insensitive substrings, as the spec
 asks; shorter ones match only as whole words (split at punctuation and case changes),
-because a user named "Al" would otherwise redact `AppData/Local`. The owner answered
-"same as D-027" for this point; whether that means keeping or dropping this rule for
-account names is an open question.
+because a user named "Al" would otherwise redact `AppData/Local`. The owner chose this
+over plain substring matching.
 
 ### D-029: Always-on redactions — Reported (Phase 2)
 The current profile is rendered as `~`. Other users' profile folders, every local account
