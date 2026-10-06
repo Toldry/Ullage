@@ -1,0 +1,17 @@
+id = "cargo-registry"
+version = 1
+name = "Cargo registry and git cache"
+what = "Crate sources and git dependencies Cargo downloaded for Rust builds."
+lost = "Nothing permanent. Crates download again on the next build."
+regenerable = "yes"
+
+[paths]
+windows = ["{UserProfile}/.cargo/registry", "{UserProfile}/.cargo/git"]
+linux = ["{UserProfile}/.cargo/registry", "{UserProfile}/.cargo/git"]
+
+[[managed_steps]]
+text = "With the cargo-cache tool installed, remove extracted sources and old checkouts."
+command = "cargo cache --autoclean"
+
+[brute_force]
+allowed = true

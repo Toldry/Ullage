@@ -1,0 +1,16 @@
+id = "visual-studio-package-cache"
+version = 1
+name = "Visual Studio and installer package cache"
+what = "Installer payloads kept so Visual Studio and other MSI-based products can repair, modify or uninstall themselves."
+lost = "Repairs and modifications need the original media or a download; some uninstallers fail without their cached package."
+regenerable = "partially"
+
+[paths]
+windows = ["{ProgramData}/Microsoft/VisualStudio/Packages", "{ProgramData}/Package Cache"]
+
+[[managed_steps]]
+text = "Visual Studio Installer > Modify > Installation locations, then clear Keep download cache after the installation."
+
+[brute_force]
+allowed = false
+reason = "Installers need these files to repair, modify or uninstall products."

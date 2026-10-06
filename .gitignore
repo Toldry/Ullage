@@ -1,0 +1,7 @@
+/web/dist/*
+!/web/dist/.gitkeep
+/web/node_modules/
+/bin/
+*.exe
+*.test
+*.out

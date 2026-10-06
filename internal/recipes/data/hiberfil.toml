@@ -1,0 +1,21 @@
+id = "hibernation-file"
+version = 1
+name = "Hibernation file"
+what = "hiberfil.sys holds the contents of memory for hibernation and Fast Startup."
+lost = "Hibernate and Fast Startup stop working until hibernation is turned back on."
+regenerable = "yes"
+
+[paths]
+windows = ["{SystemDrive}/hiberfil.sys"]
+
+[[managed_steps]]
+text = "To keep Fast Startup but shrink the file, use the reduced type (elevated terminal)."
+command = "powercfg /hibernate /type reduced"
+
+[[managed_steps]]
+text = "To remove the file entirely, turn hibernation off (elevated terminal)."
+command = "powercfg /hibernate off"
+
+[brute_force]
+allowed = false
+reason = "Windows locks hiberfil.sys; turning hibernation off is the only supported way to remove it."

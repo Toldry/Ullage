@@ -1,0 +1,16 @@
+id = "user-temp"
+version = 1
+name = "Temporary files (%TEMP%)"
+what = "Scratch files that programs and installers create and often forget to remove."
+lost = "Nothing apps still need, as long as files in use are skipped. An installer that is running right now may fail."
+regenerable = "yes"
+
+[paths]
+windows = ["{UserProfile}/AppData/Local/Temp"]
+
+[[managed_steps]]
+text = "Settings > System > Storage > Temporary files, or turn on Storage Sense."
+command = "start ms-settings:storagesense"
+
+[brute_force]
+allowed = true

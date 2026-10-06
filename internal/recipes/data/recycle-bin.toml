@@ -1,0 +1,21 @@
+id = "recycle-bin"
+version = 1
+name = "Recycle Bin"
+what = "Files you deleted that Windows keeps so they can be restored."
+lost = "The deleted files become unrecoverable."
+regenerable = "no"
+
+[paths]
+windows = ["{AnyVolumeRoot}/$Recycle.Bin"]
+linux = ["{UserProfile}/.local/share/Trash"]
+
+[[managed_steps]]
+text = "Right-click the Recycle Bin on the desktop and choose Empty Recycle Bin."
+
+[[managed_steps]]
+text = "Or from PowerShell, for one drive."
+command = "Clear-RecycleBin -DriveLetter C"
+
+[brute_force]
+allowed = false
+reason = "Emptying through Windows keeps the Recycle Bin's index consistent for every user."

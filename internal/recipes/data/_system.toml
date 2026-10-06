@@ -1,0 +1,23 @@
+# System tier: never analyzed, never sent to the AI, never deleted. Known recipes that
+# match inside these locations (WinSxS, Windows.old, ...) still claim their items.
+[paths]
+windows = [
+  "{SystemRoot}",
+  "{ProgramFiles}",
+  "{ProgramFilesX86}",
+  "{AnyVolumeRoot}/bootmgr",
+  "{AnyVolumeRoot}/BOOTNXT",
+  "{AnyVolumeRoot}/BOOTSECT.BAK",
+  "{AnyVolumeRoot}/Boot",
+  "{AnyVolumeRoot}/Recovery",
+  "{AnyVolumeRoot}/$WinREAgent",
+  "{AnyVolumeRoot}/$SysReset",
+  "{AnyVolumeRoot}/$Windows.~BT",
+  "{AnyVolumeRoot}/$Windows.~WS",
+  "{AnyVolumeRoot}/DumpStack.log.tmp",
+  "{AnyVolumeRoot}/DumpStack.log",
+]
+linux = [
+  "/usr", "/boot", "/etc", "/bin", "/sbin", "/lib", "/lib32", "/lib64",
+  "/proc", "/sys", "/dev", "/run", "/var/lib", "/snap",
+]

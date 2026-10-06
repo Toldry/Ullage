@@ -1,0 +1,34 @@
+id = "wsl-distro-disk"
+version = 1
+priority = 20
+name = "WSL distro disk image"
+what = "The ext4.vhdx virtual disk holding one WSL Linux distribution and everything in its home folders."
+lost = "Deleting the file destroys the distribution and all files inside it."
+regenerable = "no"
+managed_note = "Free space inside the distro first; the .vhdx only shrinks after compacting."
+
+[paths]
+windows = [
+  "{UserProfile}/AppData/Local/Packages/*/LocalState/ext4.vhdx",
+  "{UserProfile}/AppData/Local/wsl/*/ext4.vhdx",
+]
+
+[[managed_steps]]
+text = "List installed distributions and their state."
+command = "wsl --list --verbose"
+
+[[managed_steps]]
+text = "Inside the distro, clear package caches (Ubuntu example)."
+command = "sudo apt clean"
+
+[[managed_steps]]
+text = "Stop WSL, then let the disk shrink automatically from now on."
+command = "wsl --shutdown && wsl --manage <distro> --set-sparse true"
+
+[[managed_steps]]
+text = "To remove a distribution you no longer need entirely."
+command = "wsl --unregister <distro>"
+
+[brute_force]
+allowed = false
+reason = "Deleting the disk image leaves a broken registration; use wsl --unregister to remove a distro."

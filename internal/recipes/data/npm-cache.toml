@@ -1,0 +1,17 @@
+id = "npm-cache"
+version = 1
+name = "npm cache"
+what = "Content-addressed cache of every package npm has downloaded."
+lost = "Nothing. Packages download again when needed."
+regenerable = "yes"
+
+[paths]
+windows = ["{UserProfile}/AppData/Local/npm-cache"]
+linux = ["{UserProfile}/.npm/_cacache"]
+
+[[managed_steps]]
+text = "Clear through npm."
+command = "npm cache clean --force"
+
+[brute_force]
+allowed = true

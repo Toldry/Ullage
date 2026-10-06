@@ -1,0 +1,22 @@
+id = "rustup-toolchains"
+version = 1
+name = "Rust toolchains"
+what = "Rust compilers and standard libraries installed by rustup, one folder per toolchain."
+lost = "Toolchains you remove must be installed again before projects that pin them can build."
+regenerable = "yes"
+
+[paths]
+windows = ["{UserProfile}/.rustup/toolchains"]
+linux = ["{UserProfile}/.rustup/toolchains"]
+
+[[managed_steps]]
+text = "List installed toolchains."
+command = "rustup toolchain list"
+
+[[managed_steps]]
+text = "Remove the ones you no longer use."
+command = "rustup toolchain uninstall <toolchain>"
+
+[brute_force]
+allowed = false
+reason = "rustup tracks installed toolchains; deleting folders by hand leaves it inconsistent."

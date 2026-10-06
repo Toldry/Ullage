@@ -1,0 +1,16 @@
+id = "installed-applications"
+version = 1
+priority = 90
+name = "Installed applications"
+what = "Programs listed in Settings > Apps, matched by the install folder each one registered."
+lost = "The application. Reinstalling may not restore its settings."
+regenerable = "partially"
+dynamic = "installed-applications"
+
+[[managed_steps]]
+text = "Settings > Apps > Installed apps, then Uninstall the ones you no longer need."
+command = "start ms-settings:appsfeatures"
+
+[brute_force]
+allowed = false
+reason = "Uninstall through Windows so registry entries, services and shared components are removed too."

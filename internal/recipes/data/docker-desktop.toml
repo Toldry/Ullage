@@ -1,0 +1,37 @@
+id = "docker-desktop-wsl"
+version = 1
+priority = 10
+name = "Docker Desktop WSL disk image"
+what = "The WSL 2 virtual disk where Docker Desktop stores every image, container, volume and build cache."
+lost = "Deleting the file destroys all images, containers and volumes, including database data kept in volumes. Images can be pulled again; volume data cannot."
+regenerable = "partially"
+managed_note = "The .vhdx never shrinks by itself after pruning. The compact step is what returns space to the drive."
+
+[paths]
+windows = [
+  "{UserProfile}/AppData/Local/Docker/wsl/disk/docker_data.vhdx",
+  "{UserProfile}/AppData/Local/Docker/wsl/data/ext4.vhdx",
+  "{UserProfile}/AppData/Local/Docker/wsl/main/ext4.vhdx",
+  "{UserProfile}/AppData/Local/Docker/wsl/distro/ext4.vhdx",
+]
+linux = ["{UserProfile}/.docker/desktop/vms/0/data/Docker.raw"]
+
+[[managed_steps]]
+text = "See what is using space inside Docker."
+command = "docker system df -v"
+
+[[managed_steps]]
+text = "Remove unused images, stopped containers and build cache. Volumes are kept."
+command = "docker system prune -a"
+
+[[managed_steps]]
+text = "Quit Docker Desktop, then stop WSL."
+command = "wsl --shutdown"
+
+[[managed_steps]]
+text = "Compact the disk image (elevated PowerShell, needs the Hyper-V module)."
+command = "Optimize-VHD -Path \"$env:LOCALAPPDATA\\Docker\\wsl\\disk\\docker_data.vhdx\" -Mode Full"
+
+[brute_force]
+allowed = false
+reason = "Deleting the disk image under an installed Docker Desktop breaks it. To start over, use Docker Desktop > Troubleshoot > Clean / Purge data."

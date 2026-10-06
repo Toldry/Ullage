@@ -1,0 +1,17 @@
+id = "gradle-caches"
+version = 1
+name = "Gradle caches"
+what = "Downloaded dependencies, transformed artifacts and Gradle distributions."
+lost = "Nothing permanent. The next build downloads and transforms everything again."
+regenerable = "yes"
+
+[paths]
+windows = ["{UserProfile}/.gradle/caches", "{UserProfile}/.gradle/wrapper/dists"]
+linux = ["{UserProfile}/.gradle/caches", "{UserProfile}/.gradle/wrapper/dists"]
+
+[[managed_steps]]
+text = "Stop Gradle daemons so no files are locked."
+command = "gradle --stop"
+
+[brute_force]
+allowed = true

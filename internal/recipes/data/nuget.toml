@@ -1,0 +1,21 @@
+id = "nuget-packages"
+version = 1
+name = "NuGet package cache"
+what = "The global packages folder and HTTP cache used by dotnet restore, MSBuild and Visual Studio."
+lost = "Nothing permanent. Packages restore on the next build, which is slower and needs network access."
+regenerable = "yes"
+
+[paths]
+windows = ["{UserProfile}/.nuget/packages", "{UserProfile}/AppData/Local/NuGet/v3-cache"]
+linux = ["{UserProfile}/.nuget/packages", "{UserProfile}/.local/share/NuGet/v3-cache"]
+
+[[managed_steps]]
+text = "Stop build servers that hold files open."
+command = "dotnet build-server shutdown"
+
+[[managed_steps]]
+text = "Clear every NuGet cache through the .NET CLI."
+command = "dotnet nuget locals all --clear"
+
+[brute_force]
+allowed = true

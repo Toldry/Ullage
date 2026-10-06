@@ -80,6 +80,38 @@ then `go build`.
 
 ---
 
+## 1.3 Keeping a future Linux port cheap
+
+Ullage targets Windows only for now, but Linux support is a likely future demand, so no
+decision below may assume Windows outside one boundary:
+
+- **One platform boundary.** Everything OS-specific lives in `internal/platform`, split by
+  build tags (`*_windows.go`, `*_linux.go`). Core packages (scanner, tiers, recipes, redaction,
+  prompt, parser, deletion guard) use only its portable types: `DirectoryEntry`, `FileID`,
+  `Volume`, `KnownLocations`. The Linux implementation exists from Phase 1 (it backs the
+  real-filesystem tests in the Linux container), so the seam is exercised, not theoretical.
+- **Portable concepts, OS-specific mechanisms.**
+
+  | Concept                 | Windows                                   | Linux (future)                    |
+  |-------------------------|-------------------------------------------|-----------------------------------|
+  | File identity           | volume serial + 128-bit file ID           | `st_dev` + inode                  |
+  | On-disk size            | `AllocationSize` / `GetCompressedFileSizeW` | `st_blocks x 512`               |
+  | Link count              | unknown during enumeration (seen-set)     | `st_nlink` (set only when > 1)    |
+  | Do-not-traverse entries | junctions, symlinks, mount points         | symlinks, other filesystems       |
+  | Elevated                | token elevation                           | effective UID 0                   |
+  | Secret storage          | DPAPI                                     | a `SecretProtector` backend (Secret Service or a key file) |
+  | Recycle Bin             | `IFileOperation`                          | freedesktop.org Trash spec        |
+  | Installed apps          | Uninstall registry keys                   | package manager queries           |
+  | Config directory        | `%APPDATA%\Ullage`                        | `$XDG_CONFIG_HOME/ullage`         |
+
+- **Data, not code, for OS knowledge.** Recipes and System-tier rules list path patterns per
+  OS (`[paths] windows = [...]`, `linux = [...]`) using variables such as `{UserProfile}` and
+  `{LocalAppData}` that each platform expands.
+- **Paths.** Stored natively; rendered with `/` separators in prompts and the UI on every OS.
+  Case-insensitive comparison is a platform property, not a hard-coded assumption.
+
+---
+
 ## 2. Module layout
 
 ```

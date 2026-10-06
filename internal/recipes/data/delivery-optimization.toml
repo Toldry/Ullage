@@ -1,0 +1,24 @@
+id = "delivery-optimization"
+version = 1
+name = "Delivery Optimization cache"
+what = "Windows Update and Store downloads kept to share with other PCs."
+lost = "Nothing; updates download again when needed."
+regenerable = "yes"
+
+[paths]
+windows = [
+  "{SystemRoot}/ServiceProfiles/NetworkService/AppData/Local/Microsoft/Windows/DeliveryOptimization/Cache",
+  "{SystemRoot}/SoftwareDistribution/DeliveryOptimization",
+]
+
+[[managed_steps]]
+text = "Settings > System > Storage > Temporary files, then select Delivery Optimization Files."
+command = "start ms-settings:storagesense"
+
+[[managed_steps]]
+text = "Or clear it from an elevated PowerShell."
+command = "Delete-DeliveryOptimizationCache -Force"
+
+[brute_force]
+allowed = false
+reason = "It is under the Windows folder, where Ullage never deletes."

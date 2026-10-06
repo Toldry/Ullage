@@ -1,0 +1,22 @@
+id = "restore-points"
+version = 1
+name = "Restore points and shadow copies"
+what = "System Restore points and Volume Shadow Copies, stored in System Volume Information."
+lost = "You can no longer roll Windows back to the deleted restore points or restore previous versions of files from them."
+regenerable = "no"
+managed_note = "Without administrator rights this folder cannot be measured and shows as 0 B."
+
+[paths]
+windows = ["{AnyVolumeRoot}/System Volume Information"]
+
+[[managed_steps]]
+text = "Open System Protection, choose the drive, click Configure, then Delete or lower Max Usage."
+command = "SystemPropertiesProtection.exe"
+
+[[managed_steps]]
+text = "List how much space shadow copies use (elevated terminal)."
+command = "vssadmin list shadowstorage"
+
+[brute_force]
+allowed = false
+reason = "The folder belongs to the SYSTEM account; only the shadow copy service can remove its contents safely."

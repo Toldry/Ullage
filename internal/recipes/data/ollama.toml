@@ -1,0 +1,22 @@
+id = "ollama-models"
+version = 1
+name = "Ollama models"
+what = "Local language models pulled or created with Ollama, stored as shared blobs plus manifests."
+lost = "Pulled models download again; models you created from a Modelfile must be rebuilt."
+regenerable = "partially"
+
+[paths]
+windows = ["{UserProfile}/.ollama/models"]
+linux = ["{UserProfile}/.ollama/models", "/usr/share/ollama/.ollama/models"]
+
+[[managed_steps]]
+text = "List installed models."
+command = "ollama list"
+
+[[managed_steps]]
+text = "Remove the ones you no longer use."
+command = "ollama rm <model>"
+
+[brute_force]
+allowed = false
+reason = "Blobs are shared between models; deleting files by hand corrupts the manifests."

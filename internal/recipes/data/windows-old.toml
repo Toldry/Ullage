@@ -1,0 +1,17 @@
+id = "previous-windows"
+version = 1
+name = "Previous Windows installation"
+what = "Windows.old keeps the previous Windows version after a feature upgrade so you can go back."
+lost = "Going back to the previous Windows version. Windows removes it on its own after about 10 days."
+regenerable = "no"
+
+[paths]
+windows = ["{SystemDrive}/Windows.old"]
+
+[[managed_steps]]
+text = "Settings > System > Storage > Temporary files, then select Previous Windows installation(s) and remove."
+command = "start ms-settings:storagesense"
+
+[brute_force]
+allowed = false
+reason = "Its files are owned by TrustedInstaller and protected; Windows removes the folder cleanly."

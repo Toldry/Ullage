@@ -1,0 +1,17 @@
+id = "pip-cache"
+version = 1
+name = "pip cache"
+what = "Downloaded Python wheels and source archives that pip reuses."
+lost = "Nothing. Packages download again on the next install."
+regenerable = "yes"
+
+[paths]
+windows = ["{UserProfile}/AppData/Local/pip/Cache"]
+linux = ["{UserProfile}/.cache/pip"]
+
+[[managed_steps]]
+text = "Clear through pip."
+command = "pip cache purge"
+
+[brute_force]
+allowed = true

@@ -1,0 +1,17 @@
+id = "system-temp"
+version = 1
+name = "Windows temporary files"
+what = "Temporary files of Windows services and installers in the Windows folder."
+lost = "Nothing in use; Windows recreates what it needs."
+regenerable = "yes"
+
+[paths]
+windows = ["{SystemRoot}/Temp"]
+
+[[managed_steps]]
+text = "Settings > System > Storage > Temporary files, or run Disk Cleanup as administrator."
+command = "cleanmgr.exe /sageset:1"
+
+[brute_force]
+allowed = false
+reason = "It is under the Windows folder, where Ullage never deletes."
