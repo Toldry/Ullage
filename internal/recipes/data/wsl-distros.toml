@@ -2,7 +2,9 @@ id = "wsl-distro-disk"
 version = 1
 priority = 20
 name = "WSL distro disk image"
-what = "The ext4.vhdx virtual disk holding one WSL Linux distribution and everything in its home folders."
+what = """\
+  The ext4.vhdx virtual disk holding one WSL Linux distribution and everything in its home \
+  folders."""
 lost = "Deleting the file destroys the distribution and all files inside it."
 regenerable = "no"
 managed_note = "Free space inside the distro first; the .vhdx only shrinks after compacting."
@@ -31,4 +33,6 @@ command = "wsl --unregister <distro>"
 
 [brute_force]
 allowed = false
-reason = "Deleting the disk image leaves a broken registration; use wsl --unregister to remove a distro."
+reason = """\
+  Deleting the disk image leaves a broken registration; use wsl --unregister to remove a \
+  distro."""

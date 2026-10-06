@@ -7,7 +7,9 @@ regenerable = "yes"
 
 [paths]
 windows = [
-  "{SystemRoot}/ServiceProfiles/NetworkService/AppData/Local/Microsoft/Windows/DeliveryOptimization/Cache",
+  """\
+    {SystemRoot}/ServiceProfiles/NetworkService/AppData/Local/Microsoft/Windows/\
+    DeliveryOptimization/Cache""",
   "{SystemRoot}/SoftwareDistribution/DeliveryOptimization",
 ]
 

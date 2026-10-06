@@ -1,8 +1,12 @@
 id = "pagefile"
 version = 1
 name = "Page file and swap file"
-what = "Virtual memory: Windows moves memory pages here when RAM is full. swapfile.sys serves Store apps."
-lost = "Nothing is stored long-term, but a page file that is too small causes out-of-memory errors and prevents crash dumps."
+what = """\
+  Virtual memory: Windows moves memory pages here when RAM is full. swapfile.sys serves Store \
+  apps."""
+lost = """\
+  Nothing is stored long-term, but a page file that is too small causes out-of-memory errors \
+  and prevents crash dumps."""
 regenerable = "yes"
 
 [paths]
@@ -10,9 +14,13 @@ windows = ["{AnyVolumeRoot}/pagefile.sys", "{AnyVolumeRoot}/swapfile.sys"]
 linux = ["/swapfile", "/swap.img"]
 
 [[managed_steps]]
-text = "Open System Properties > Advanced > Performance Settings > Advanced > Virtual memory > Change, then set a smaller custom size or move it to another drive."
+text = """\
+  Open System Properties > Advanced > Performance Settings > Advanced > Virtual memory > \
+  Change, then set a smaller custom size or move it to another drive."""
 command = "SystemPropertiesAdvanced.exe"
 
 [brute_force]
 allowed = false
-reason = "Windows keeps the page file open while running; it can only be resized or moved through system settings."
+reason = """\
+  Windows keeps the page file open while running; it can only be resized or moved through \
+  system settings."""

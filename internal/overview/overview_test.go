@@ -70,6 +70,9 @@ func TestBuildPartitionsAndDrillsIntoDominantFolders(t *testing.T) {
 	if model.Known.RecipesMatched != 1 || model.Groups[1].Items[0].Label != "npm cache" {
 		t.Fatalf("known = %+v %+v", model.Known, model.Groups[1])
 	}
+	if model.UnknownFolders != 3 {
+		t.Fatalf("unknown folders = %d, want 3", model.UnknownFolders)
+	}
 	labels := []string{}
 	for _, item := range model.Groups[0].Items {
 		labels = append(labels, item.Label)

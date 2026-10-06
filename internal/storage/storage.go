@@ -18,6 +18,12 @@ type Config struct {
 
 const configFileName = "config.json"
 
+// ConfigExists reports whether preferences were ever saved, which marks a first run.
+func ConfigExists(directory string) bool {
+	_, err := os.Stat(filepath.Join(directory, configFileName))
+	return err == nil
+}
+
 // LoadConfig returns the saved config, or defaults when none exists yet.
 func LoadConfig(directory string) (Config, error) {
 	content, err := os.ReadFile(filepath.Join(directory, configFileName))

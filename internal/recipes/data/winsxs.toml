@@ -1,7 +1,9 @@
 id = "component-store"
 version = 1
 name = "Windows component store (WinSxS)"
-what = "Every Windows component and the previous versions kept after updates. Most files are hard links shared with System32; Ullage counts shared bytes once, at System32."
+what = """\
+  Every Windows component and the previous versions kept after updates. Most files are hard \
+  links shared with System32; Ullage counts shared bytes once, at System32."""
 lost = "After cleanup you can no longer uninstall the superseded updates."
 regenerable = "no"
 

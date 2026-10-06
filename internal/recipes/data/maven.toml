@@ -2,7 +2,9 @@ id = "maven-repository"
 version = 1
 name = "Maven local repository"
 what = "Artifacts Maven downloaded, plus anything installed locally with mvn install."
-lost = "Downloaded artifacts come back on the next build; artifacts you only ever built locally with mvn install do not."
+lost = """\
+  Downloaded artifacts come back on the next build; artifacts you only ever built locally with \
+  mvn install do not."""
 regenerable = "partially"
 
 [paths]

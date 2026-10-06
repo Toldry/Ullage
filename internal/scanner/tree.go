@@ -171,7 +171,8 @@ func (tree *Tree) pathComponents(index NodeIndex) []string {
 func (tree *Tree) comparePaths(first, second NodeIndex) int {
 	firstComponents := tree.pathComponents(first)
 	secondComponents := tree.pathComponents(second)
-	for position := 0; position < len(firstComponents) && position < len(secondComponents); position++ {
+	shorter := min(len(firstComponents), len(secondComponents))
+	for position := 0; position < shorter; position++ {
 		left := strings.ToLower(firstComponents[position])
 		right := strings.ToLower(secondComponents[position])
 		if left != right {

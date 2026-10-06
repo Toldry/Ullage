@@ -158,9 +158,9 @@ func Build(input Input) Model {
 			Items: []Item{{Label: "not analyzed", Bytes: model.Totals.System}}},
 	}
 	if model.Totals.Unaccounted > 0 {
-		label := "file-system metadata"
+		label := "not in any scanned folder"
 		if model.Partial {
-			label = "unreadable and metadata"
+			label = "unreadable or not in any scanned folder"
 		}
 		model.Groups = append(model.Groups, TierGroup{Tier: "unaccounted",
 			Bytes: model.Totals.Unaccounted,
@@ -338,15 +338,21 @@ func knownItems(result *scanner.Result, classifier *tiers.Classifier,
 	return items
 }
 
+// countUnknownFolders counts Unknown-tier folders that directly hold files, whether the
+// files were aggregated into the folder or kept as their own nodes.
 func countUnknownFolders(tree *scanner.Tree) int {
-	count := 0
-	tree.Walk(func(_ scanner.NodeIndex, node *scanner.Node) {
-		if node.Kind == platform.EntryDirectory && node.Tier == scanner.TierUnknown &&
-			node.OwnBytes > 0 {
-			count++
+	holding := map[scanner.NodeIndex]bool{}
+	tree.Walk(func(index scanner.NodeIndex, node *scanner.Node) {
+		switch {
+		case node.Kind == platform.EntryDirectory && node.Tier == scanner.TierUnknown &&
+			node.SmallFileCount > 0:
+			holding[index] = true
+		case node.Kind == platform.EntryFile && node.Tier == scanner.TierUnknown &&
+			node.Parent != scanner.NoNode:
+			holding[node.Parent] = true
 		}
 	})
-	return count
+	return len(holding)
 }
 
 func pluralize(count int, noun string) string {

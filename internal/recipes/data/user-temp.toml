@@ -2,7 +2,9 @@ id = "user-temp"
 version = 1
 name = "Temporary files (%TEMP%)"
 what = "Scratch files that programs and installers create and often forget to remove."
-lost = "Nothing apps still need, as long as files in use are skipped. An installer that is running right now may fail."
+lost = """\
+  Nothing apps still need, as long as files in use are skipped. An installer that is running \
+  right now may fail."""
 regenerable = "yes"
 
 [paths]

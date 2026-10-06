@@ -76,3 +76,32 @@ func TestValidationRejectsBadRecipes(t *testing.T) {
 		}
 	}
 }
+
+// Long recipe strings are wrapped with TOML line continuations; this catches a wrap that
+// leaves a newline, a doubled space or whitespace inside a path.
+func TestWrappedStringsJoinCleanly(t *testing.T) {
+	library, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, recipe := range library.Recipes {
+		texts := []string{recipe.Name, recipe.What, recipe.Lost, recipe.ManagedNote,
+			recipe.BruteForce.Reason}
+		for _, step := range recipe.ManagedSteps {
+			texts = append(texts, step.Text, step.Command)
+		}
+		for _, text := range texts {
+			if strings.ContainsAny(text, "\n\r\t") || strings.Contains(text, "  ") ||
+				text != strings.TrimSpace(text) {
+				t.Errorf("%s: badly joined text %q", recipe.ID, text)
+			}
+		}
+		for _, patterns := range recipe.Paths {
+			for _, pattern := range patterns {
+				if strings.ContainsAny(pattern, "\n\t") || strings.Contains(pattern, "/ ") {
+					t.Errorf("%s: badly joined path %q", recipe.ID, pattern)
+				}
+			}
+		}
+	}
+}

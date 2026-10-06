@@ -1,0 +1,73 @@
+/* Color tokens from the design export (ullage-data.js). The theme is chosen by the
+   data-theme attribute on <html>; without it, the OS preference decides. */
+:root,
+:root[data-theme='dark'] {
+  --bg: #101114;
+  --bg2: #0b0c0e;
+  --bg3: #16181c;
+  --bg4: #1f2227;
+  --line: #22252a;
+  --line2: #30343b;
+  --fg: #e7e8ea;
+  --fg2: #a9adb4;
+  --fg3: #80858e;
+  --onfg: #101114;
+  --known: oklch(0.74 0.09 235);
+  --known-bg: oklch(0.74 0.09 235 / 0.16);
+  --known-bd: oklch(0.74 0.09 235 / 0.42);
+  --unk: oklch(0.74 0.11 300);
+  --unk-bg: oklch(0.74 0.11 300 / 0.16);
+  --unk-bd: oklch(0.74 0.11 300 / 0.45);
+  --ok: oklch(0.76 0.13 155);
+  --ok-bg: oklch(0.76 0.13 155 / 0.1);
+  --ok-bd: oklch(0.76 0.13 155 / 0.4);
+  --warn: oklch(0.82 0.13 80);
+  --warn-bg: oklch(0.82 0.13 80 / 0.09);
+  --warn-bd: oklch(0.82 0.13 80 / 0.4);
+  --bad: oklch(0.71 0.16 25);
+  --bad-bg: oklch(0.71 0.16 25 / 0.1);
+  --bad-bd: oklch(0.71 0.16 25 / 0.45);
+  --onbad: #1b0b08;
+  --hatch: #3a3e46;
+  --scrim: rgba(5, 6, 8, 0.66);
+  --shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: #fafaf8;
+  --bg2: #f0f0ec;
+  --bg3: #ffffff;
+  --bg4: #e8e8e3;
+  --line: #e2e2dc;
+  --line2: #cdcdc6;
+  --fg: #16171a;
+  --fg2: #4f535a;
+  --fg3: #6c7077;
+  --onfg: #fafaf8;
+  --known: oklch(0.5 0.11 240);
+  --known-bg: oklch(0.62 0.1 240 / 0.14);
+  --known-bd: oklch(0.5 0.11 240 / 0.4);
+  --unk: oklch(0.48 0.15 300);
+  --unk-bg: oklch(0.6 0.13 300 / 0.13);
+  --unk-bd: oklch(0.48 0.15 300 / 0.38);
+  --ok: oklch(0.5 0.12 155);
+  --ok-bg: oklch(0.62 0.12 155 / 0.1);
+  --ok-bd: oklch(0.5 0.12 155 / 0.4);
+  --warn: oklch(0.54 0.12 70);
+  --warn-bg: oklch(0.82 0.13 80 / 0.18);
+  --warn-bd: oklch(0.6 0.13 75 / 0.5);
+  --bad: oklch(0.52 0.19 27);
+  --bad-bg: oklch(0.62 0.18 27 / 0.09);
+  --bad-bd: oklch(0.52 0.19 27 / 0.4);
+  --onbad: #ffffff;
+  --hatch: #c9c9c2;
+  --scrim: rgba(20, 20, 22, 0.36);
+  --shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  color-scheme: light;
+}
+
+:root {
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+}

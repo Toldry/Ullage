@@ -1,8 +1,11 @@
 id = "nuget-packages"
 version = 1
 name = "NuGet package cache"
-what = "The global packages folder and HTTP cache used by dotnet restore, MSBuild and Visual Studio."
-lost = "Nothing permanent. Packages restore on the next build, which is slower and needs network access."
+what = """\
+  The global packages folder and HTTP cache used by dotnet restore, MSBuild and Visual Studio."""
+lost = """\
+  Nothing permanent. Packages restore on the next build, which is slower and needs network \
+  access."""
 regenerable = "yes"
 
 [paths]

@@ -13,4 +13,6 @@ command = "start ms-settings:appsfeatures"
 
 [brute_force]
 allowed = false
-reason = "Uninstall through Windows so registry entries, services and shared components are removed too."
+reason = """\
+  Uninstall through Windows so registry entries, services and shared components are removed \
+  too."""

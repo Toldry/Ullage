@@ -300,6 +300,7 @@ type statusResponse struct {
 	HasOverview bool           `json:"hasOverview"`
 	Config      storage.Config `json:"config"`
 	CanRelaunch bool           `json:"canRelaunch"`
+	FirstRun    bool           `json:"firstRun"`
 }
 
 func (server *Server) handleStatus(writer http.ResponseWriter, _ *http.Request) {
@@ -319,6 +320,7 @@ func (server *Server) handleStatus(writer http.ResponseWriter, _ *http.Request) 
 		HasOverview: completed != nil,
 		Config:      server.manager.Config(),
 		CanRelaunch: server.options.RelaunchElevated != nil && !server.manager.Elevated(),
+		FirstRun:    server.manager.FirstRun(),
 	})
 }
 

@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # Windows is the product's platform and runs the Win32 fixtures (junctions, NTFS
+    # compression, sparse files, ACLs). Linux keeps the portability seam honest.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build frontend
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+          npm test
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test (includes the no-network build check)
+        run: go test -race ./...
+
+      - name: No-network check over the final bundle
+        run: go run ./tools/nonetwork .
+
+      - name: Build executable
+        if: runner.os == 'Windows'
+        shell: bash
+        run: go build -trimpath -ldflags "-H windowsgui -s -w" -o ullage.exe ./cmd/ullage
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: ullage-windows
+          path: ullage.exe

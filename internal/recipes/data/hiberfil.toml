@@ -18,4 +18,5 @@ command = "powercfg /hibernate off"
 
 [brute_force]
 allowed = false
-reason = "Windows locks hiberfil.sys; turning hibernation off is the only supported way to remove it."
+reason = """\
+  Windows locks hiberfil.sys; turning hibernation off is the only supported way to remove it."""

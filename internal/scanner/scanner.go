@@ -299,7 +299,7 @@ func (scan *Scan) addRoot(rootPath string) {
 	}
 	scan.tree.Roots = append(scan.tree.Roots, indices[0])
 	scan.recordClaim(indices[0], classification, NoClaim)
-	scan.emit(EventStart, "scanning "+rootPath, rootPath, 0)
+	scan.emit(EventStart, rootPath, "", 0)
 	scan.enqueue(directoryJob{node: indices[0], path: rootPath,
 		classification: classification, state: state})
 }

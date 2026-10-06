@@ -85,6 +85,7 @@ type Manager struct {
 
 	lock      sync.Mutex
 	config    storage.Config
+	firstRun  bool
 	state     State
 	failure   string
 	current   *running
@@ -103,7 +104,8 @@ func NewManager(environment Environment) (*Manager, error) {
 		return nil, fmt.Errorf("read config: %w", err)
 	}
 	return &Manager{environment: environment, library: library, config: config,
-		state: StateIdle, log: newEventLog(400)}, nil
+		firstRun: !storage.ConfigExists(environment.ConfigDirectory), state: StateIdle,
+		log: newEventLog(400)}, nil
 }
 
 // Config returns the current preferences.
@@ -126,6 +128,9 @@ func (manager *Manager) UpdateConfig(update func(*storage.Config)) (storage.Conf
 	manager.config = next
 	return next, nil
 }
+
+// FirstRun is true when Ullage has never saved preferences on this PC.
+func (manager *Manager) FirstRun() bool { return manager.firstRun }
 
 // Elevated reports whether the process runs with administrator rights.
 func (manager *Manager) Elevated() bool { return manager.environment.Elevated }

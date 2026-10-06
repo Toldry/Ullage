@@ -63,12 +63,16 @@ func TestFixtureSparseFileUsesAllocatedSize(t *testing.T) {
 func TestFixtureCompressedFileUsesCompressedSize(t *testing.T) {
 	root := t.TempDir()
 	compressedPath := filepath.Join(root, "compressible.txt")
-	if err := os.WriteFile(compressedPath, make([]byte, 8<<20), 0o644); err != nil {
+	if err := os.WriteFile(compressedPath, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// Enable compression first: NTFS compresses data as it is written.
 	format := uint16(compressionDefault)
 	deviceControl(t, compressedPath, controlSetCompression,
 		unsafe.Slice((*byte)(unsafe.Pointer(&format)), 2))
+	if err := os.WriteFile(compressedPath, make([]byte, 8<<20), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	result := scanDirectory(t, root)
 	node := findNode(t, result, compressedPath)
 	if node.Attributes&platform.AttributeCompressed == 0 {

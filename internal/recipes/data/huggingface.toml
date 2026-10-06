@@ -1,8 +1,12 @@
 id = "huggingface-cache"
 version = 1
 name = "Hugging Face model cache"
-what = "Model weights and datasets downloaded by the huggingface_hub library, one models--* folder per model."
-lost = "The weights. Public models download again; gated models need your account to still have access."
+what = """\
+  Model weights and datasets downloaded by the huggingface_hub library, one models--* folder \
+  per model."""
+lost = """\
+  The weights. Public models download again; gated models need your account to still have \
+  access."""
 regenerable = "partially"
 
 [paths]

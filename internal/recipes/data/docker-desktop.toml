@@ -2,10 +2,16 @@ id = "docker-desktop-wsl"
 version = 1
 priority = 10
 name = "Docker Desktop WSL disk image"
-what = "The WSL 2 virtual disk where Docker Desktop stores every image, container, volume and build cache."
-lost = "Deleting the file destroys all images, containers and volumes, including database data kept in volumes. Images can be pulled again; volume data cannot."
+what = """\
+  The WSL 2 virtual disk where Docker Desktop stores every image, container, volume and build \
+  cache."""
+lost = """\
+  Deleting the file destroys all images, containers and volumes, including database data kept \
+  in volumes. Images can be pulled again; volume data cannot."""
 regenerable = "partially"
-managed_note = "The .vhdx never shrinks by itself after pruning. The compact step is what returns space to the drive."
+managed_note = """\
+  The .vhdx never shrinks by itself after pruning. The compact step is what returns space to \
+  the drive."""
 
 [paths]
 windows = [
@@ -34,4 +40,6 @@ command = "Optimize-VHD -Path \"$env:LOCALAPPDATA\\Docker\\wsl\\disk\\docker_dat
 
 [brute_force]
 allowed = false
-reason = "Deleting the disk image under an installed Docker Desktop breaks it. To start over, use Docker Desktop > Troubleshoot > Clean / Purge data."
+reason = """\
+  Deleting the disk image under an installed Docker Desktop breaks it. To start over, use \
+  Docker Desktop > Troubleshoot > Clean / Purge data."""
