@@ -96,9 +96,11 @@ func buildEntries(items []Item, redactor *redact.Redactor, options Options) []en
 	for index, item := range items {
 		segments := splitRendered(redactor.Render(item.Node))
 		if item.Kind == ItemLooseContents {
-			segments = append(segments, "*")
+			// "Local/*" reads as "the rest of Local"; a bare "*" under a header would not.
+			segments[len(segments)-1] += "/*"
 		}
-		if item.Kind == ItemFolder && item.nameShown {
+		name := segments[len(segments)-1]
+		if item.Kind == ItemFolder && item.nameShown && !genericName.MatchString(name) {
 			key := segments[0] + "\x00" + strings.ToLower(segments[len(segments)-1])
 			if _, seen := groups[key]; !seen {
 				groupOrder = append(groupOrder, key)
@@ -192,21 +194,34 @@ func renderData(entries []entry, items []Item) string {
 	return builder.String()
 }
 
-// headerRun finds the header for entries[start:] and how many entries share it. It
-// extends a run while the header stays deep enough and items stay close below it.
+// headerRun finds the header for entries[start:] and how many entries share it. A
+// shorter header is accepted when the characters it adds to every line of the run are
+// fewer than the header line it saves, and items stay within a few levels of it.
 func headerRun(entries []entry, start int) ([]string, int) {
 	header := entries[start].parent
 	end := start + 1
 	for end < len(entries) {
 		candidate := commonPrefix(header, entries[end].parent)
-		if len(candidate) < len(header)-1 || len(candidate) == 0 ||
-			!allWithinReach(entries[start:end+1], candidate) {
+		if len(candidate) == 0 || !allWithinReach(entries[start:end+1], candidate) {
+			break
+		}
+		added := (end - start) * segmentsLength(header[len(candidate):])
+		saved := segmentsLength(entries[end].parent) + 1
+		if len(candidate) < len(header) && added >= saved {
 			break
 		}
 		header = candidate
 		end++
 	}
 	return header, end
+}
+
+func segmentsLength(segments []string) int {
+	length := 0
+	for _, segment := range segments {
+		length += len(segment) + 1
+	}
+	return length
 }
 
 func allWithinReach(entries []entry, header []string) bool {

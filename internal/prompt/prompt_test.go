@@ -1,6 +1,7 @@
 package prompt
 
 import (
+	"fmt"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -44,7 +45,7 @@ func sampleFileSystem() *scannertest.FileSystem {
 	}
 	add("/c/Users/mara/projects/kestrel/build/out.bin", 9*1024, month(2026, 9))
 	add("/c/Users/mara/projects/kestrel/src/core.bin", 150, month(2026, 9))
-	for index := 0; index < 20; index++ {
+	for index := 0; index < 25; index++ {
 		add("/c/Users/mara/Videos/archive/clip"+itoa(index)+".mp4", 900, month(2019, 6))
 	}
 	add("/c/Users/mara/Documents/notes.txt", 1, month(2026, 1))
@@ -91,8 +92,9 @@ func TestSampleExport(t *testing.T) {
 		"@SESSION 7KQX2M\n/c/Users/~/AppData/Local\n",
 		" 1 6.2G Temp [900 files] m2025-03 {tmp}\n",
 		" 2 41G Vendor/blob.vhdx m2026-09\n",
-		" 5-8 3.5G projects/node_modules x4 [12 files] m2024-01 {bin}\n",
-		" 9 18G Videos/archive [20 files] m2019-06 {mp4}\n",
+		"/c/Users/~/projects\n",
+		" 5-8 3.5G node_modules x4 [12 files] m2024-01 {bin}\n",
+		"/c/Users/~/Videos\n 9 22G archive [25 files] m2019-06 {mp4}\n",
 		"(end of data: IDs 1-9, batch 1 of 1)",
 		"@END 7KQX2M",
 	} {
@@ -100,8 +102,8 @@ func TestSampleExport(t *testing.T) {
 			t.Errorf("prompt lacks %q:\n%s", expected, text)
 		}
 	}
-	if !regexp.MustCompile(` 3 150M projects/<R\d+>/\*\n`).MatchString(text) ||
-		!regexp.MustCompile(` 4 9G projects/<R\d+>/build m2026-09 \{bin\}\n`).
+	if !regexp.MustCompile(` 3 150M <R\d+>/\*\n`).MatchString(text) ||
+		!regexp.MustCompile(` 4 9G <R\d+>/build m2026-09 \{bin\}\n`).
 			MatchString(text) {
 		t.Errorf("redacted folder lines wrong:\n%s", text)
 	}
@@ -227,9 +229,9 @@ func TestRedactedItemsCarryOnlyTheirSize(t *testing.T) {
 	export := Build(fixture.result.Tree, fixture.redactor, "7KQX2M", DefaultOptions)
 	matched := false
 	for _, line := range dataLines(export.Batches[0].Text) {
-		if strings.Contains(line, "Videos/<R") {
+		if strings.Contains(line, "<R") {
 			matched = true
-			if !regexp.MustCompile(`^ \d+ 18G Videos/<R\d+>$`).MatchString(line) {
+			if !regexp.MustCompile(`^ \d+ 22G (Videos/)?<R\d+>$`).MatchString(line) {
 				t.Errorf("redacted item carries metadata: %q", line)
 			}
 		}
@@ -270,5 +272,46 @@ func TestWorkedExampleParses(t *testing.T) {
 		Batch: 1, BatchCount: 1, FirstID: 1, LastID: 10})
 	if !result.Valid() || len(result.Categories) != 4 {
 		t.Fatalf("worked example does not parse: %+v", result)
+	}
+}
+
+func TestContentAwareRollup(t *testing.T) {
+	fileSystem := scannertest.New()
+	for year := 2015; year <= 2020; year++ {
+		for monthNumber := 1; monthNumber <= 12; monthNumber++ {
+			fileSystem.AddFile("/c/Users/mara/Pictures/"+strconv.Itoa(year)+"/"+
+				fmt.Sprintf("%02d", monthNumber)+"/IMG.JPG", 150*megabyte, 0)
+		}
+	}
+	mixed := []string{"setup.exe", "ubuntu.iso", "lecture.mp4", "scan.pdf", "game.zip"}
+	for index, name := range mixed {
+		fileSystem.AddFile("/c/Users/mara/Downloads/"+name, int64(200+index)*megabyte, 0)
+	}
+	for index := 0; index < 30; index++ {
+		fileSystem.AddFile("/c/Users/mara/Archive/part"+strconv.Itoa(index)+".rar",
+			150*megabyte, 0)
+	}
+	fileSystem.AddFile("/c/Users/mara/Music/loose.flac", 300*megabyte, 0)
+	fileSystem.AddFile("/c/Users/mara/Music/Band/album.flac", 400*megabyte, 0)
+	result := fileSystem.Scan(t, "/c", nil)
+	redactor := redact.New(redact.Options{Tree: result.Tree,
+		Registry: redact.NewRegistry(nil, 1, true),
+		Context:  redact.Context{CurrentProfile: filepath.FromSlash("/c/Users/mara")}})
+	text := Build(result.Tree, redactor, "7KQX2M", DefaultOptions).Batches[0].Text
+	lines := strings.Join(dataLines(text), "\n")
+
+	if !strings.Contains(lines, "Pictures [72 files] {jpg}") || strings.Contains(lines, "x6") {
+		t.Errorf("photo library by year and month should be one line:\n%s", lines)
+	}
+	for _, name := range mixed {
+		if !strings.Contains(lines, name) {
+			t.Errorf("mixed downloads should be listed per file; %s missing:\n%s", name, lines)
+		}
+	}
+	if !strings.Contains(lines, "Archive [30 files] {rar}") {
+		t.Errorf("a homogeneous archive of many files should be one line:\n%s", lines)
+	}
+	if !strings.Contains(lines, "Music/* ") && !strings.Contains(lines, "loose.flac") {
+		t.Errorf("loose contents line missing:\n%s", lines)
 	}
 }

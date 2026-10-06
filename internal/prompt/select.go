@@ -4,6 +4,7 @@
 package prompt
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/toldry/ullage/internal/platform"
@@ -62,8 +63,17 @@ var DefaultOptions = Options{
 	MaximumItems:       900,
 	BatchLines:         300,
 	CollapseMinimum:    3,
-	ManyFilesThreshold: 12,
+	ManyFilesThreshold: 20,
 }
+
+// homogeneousShare is the share of one file type above which a folder counts as one
+// kind of content (a photo library, a folder of downloaded archives).
+const homogeneousShare = 0.8
+
+// genericName matches names that say nothing about content: numbers and dates such as
+// 2019, 01 or 2019-05-12. Splitting a photo library into such folders adds lines but no
+// meaning, and grouping them ("01 x11") would mislead.
+var genericName = regexp.MustCompile(`^[\d\s._-]+$`)
 
 // selfDescribingNames are folders whose name already says what they hold; splitting them
 // would spend lines on their internals (packages, objects, cache entries) for nothing.
@@ -187,7 +197,31 @@ func (selection *selector) splittable(current candidate) bool {
 		return false
 	}
 	children := selection.significantChildren(current.node, current.insideHidden)
-	return len(children) > 0 && !selection.isUniformFileArchive(children)
+	if len(children) == 0 {
+		return false
+	}
+	if !selection.isHomogeneous(current.node) {
+		return true
+	}
+	// One kind of content: split only if the children's names say something.
+	allFiles, allGeneric := true, true
+	for _, child := range children {
+		childNode := selection.tree.Node(child)
+		allFiles = allFiles && childNode.Kind == platform.EntryFile
+		allGeneric = allGeneric && genericName.MatchString(childNode.Name)
+	}
+	manyFiles := allFiles && len(children) > selection.options.ManyFilesThreshold
+	return !manyFiles && !allGeneric
+}
+
+// isHomogeneous reports whether one file type makes up most of the folder's bytes.
+func (selection *selector) isHomogeneous(index scanner.NodeIndex) bool {
+	shares := scanner.MergeExtensions(selection.subtreeExtensions(index), 1<<10)
+	var total int64
+	for _, share := range shares {
+		total += share.Bytes
+	}
+	return total > 0 && float64(shares[0].Bytes) >= homogeneousShare*float64(total)
 }
 
 func (selection *selector) toItem(current candidate) Item {
@@ -236,18 +270,6 @@ func (selection *selector) significantChildren(index scanner.NodeIndex,
 	return significant
 }
 
-func (selection *selector) isUniformFileArchive(children []scanner.NodeIndex) bool {
-	if len(children) <= selection.options.ManyFilesThreshold {
-		return false
-	}
-	for _, child := range children {
-		if selection.tree.Node(child).Kind != platform.EntryFile {
-			return false
-		}
-	}
-	return true
-}
-
 func (selection *selector) looseFileCount(index scanner.NodeIndex,
 	listed []scanner.NodeIndex) int64 {
 	isListed := map[scanner.NodeIndex]bool{}
@@ -257,7 +279,7 @@ func (selection *selector) looseFileCount(index scanner.NodeIndex,
 	node := selection.tree.Node(index)
 	count := int64(node.SmallFileCount)
 	for _, child := range node.Children {
-		if !isListed[child] {
+		if !isListed[child] && selection.unknown(child) > 0 {
 			count += selection.tree.Node(child).TotalFiles
 		}
 	}
@@ -279,7 +301,7 @@ func (selection *selector) metadata(index scanner.NodeIndex, kind ItemKind,
 		newest := node.SmallFilesModified
 		summaries := [][]scanner.ExtensionShare{node.Extensions}
 		for _, child := range node.Children {
-			if isListed[child] {
+			if isListed[child] || selection.unknown(child) == 0 {
 				continue
 			}
 			newest = max(newest, selection.tree.Node(child).LatestModified)
