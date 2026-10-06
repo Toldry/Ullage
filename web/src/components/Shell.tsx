@@ -149,7 +149,7 @@ export function StatusBar(props: {
       {props.files !== undefined && <span>{formatCount(props.files)} files indexed</span>}
       <span>{props.elevated ? 'elevated' : 'not elevated'}</span>
       <div class="spacer" />
-      <span>1–3 steps · R rules · Enter start · Esc cancel · T theme</span>
+      <span>1–5 steps · R rules · Enter start · Esc cancel · T theme</span>
     </footer>
   );
 }

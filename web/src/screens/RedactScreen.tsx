@@ -20,6 +20,7 @@ import type {
 interface Props {
   guard: <T>(work: Promise<T>) => Promise<T | undefined>;
   onOpenRules: () => void;
+  onContinue: () => void;
 }
 
 type Tab = 'all' | 'redacted' | 'rule';
@@ -37,7 +38,7 @@ interface Row {
 const smallItemBytes = 50 * 1024 ** 2;
 const rootParent = -1;
 
-export function RedactScreen({ guard, onOpenRules }: Props) {
+export function RedactScreen({ guard, onOpenRules, onContinue }: Props) {
   const [summary, setSummary] = useState<RedactionSummary | null>(null);
   const [childrenByParent, setChildrenByParent] = useState<Map<number, RedactionChildren>>(
     new Map());
@@ -212,8 +213,8 @@ export function RedactScreen({ guard, onOpenRules }: Props) {
     <div class="screen screen-wide redact">
       <div class="screen-header">
         <Heading />
-        <button type="button" class="button button-primary button-with-key" disabled
-          title="Prompt export arrives in Phase 3">
+        <button type="button" class="button button-primary button-with-key"
+          onClick={onContinue}>
           Continue to export
           <Kbd inverse>4</Kbd>
         </button>

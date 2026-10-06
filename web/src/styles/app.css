@@ -1654,3 +1654,273 @@ h1 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
+
+/* ---------- export and paste ---------- */
+.normal-case {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+}
+
+.export-header {
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.placeholder-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--unk-bg);
+  border: 1px solid var(--unk-bd);
+}
+
+.export-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 18px;
+  align-items: start;
+}
+
+.prompt-text {
+  max-height: 620px;
+  overflow: auto;
+  padding: 8px 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 19px;
+  background: var(--bg3);
+}
+
+.prompt-line {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.line-number {
+  text-align: right;
+  color: var(--fg3);
+  user-select: none;
+}
+
+.line-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding-right: 12px;
+}
+
+.copy-card {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.copy-button {
+  justify-content: center;
+}
+
+.steps-card {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.step-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.batch-row {
+  display: grid;
+  grid-template-columns: 70px 80px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 9px 14px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.batch-row.static {
+  grid-template-columns: 70px minmax(0, 1fr);
+  cursor: default;
+}
+
+.batch-row.active {
+  background: var(--bg4);
+}
+
+.ok-text {
+  color: var(--ok);
+}
+
+.batch-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stepper-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.stepper-dot {
+  width: 22px;
+  height: 6px;
+  border-radius: 3px;
+  border: none;
+  padding: 0;
+  background: var(--line2);
+  cursor: pointer;
+}
+
+.stepper-dot.done {
+  background: var(--ok);
+}
+
+.stepper-dot.current {
+  outline: 1px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.paste-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.paste-input {
+  display: block;
+  width: 100%;
+  min-height: 300px;
+  padding: 12px 14px;
+  border: none;
+  background: var(--bg3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 19px;
+  resize: vertical;
+  outline: none;
+}
+
+.result-card {
+  border-radius: 6px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tone-ok {
+  border: 1px solid var(--ok-bd);
+  background: var(--ok-bg);
+}
+
+.tone-bad {
+  border: 1px solid var(--bad-bd);
+  background: var(--bad-bg);
+}
+
+.tone-warn {
+  border: 1px solid var(--warn-bd);
+  background: var(--warn-bg);
+}
+
+.result-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.tone-ok .result-title {
+  color: var(--ok);
+}
+
+.tone-bad .result-title {
+  color: var(--bad);
+}
+
+.tone-warn .result-title {
+  color: var(--warn);
+}
+
+.problem-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.problem-row {
+  display: grid;
+  grid-template-columns: 60px 180px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.repair {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.repair-text {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.checks {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.check-row {
+  display: grid;
+  grid-template-columns: 10px 40px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.check-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.dot.check-pass {
+  background: var(--ok);
+}
+
+.dot.check-fail {
+  background: var(--bad);
+}
+
+.dot.check-skip {
+  background: var(--line2);
+}
+
+.check-label.check-pass {
+  color: var(--ok);
+}
+
+.check-label.check-fail {
+  color: var(--bad);
+}
+
+.check-label.check-skip {
+  color: var(--fg3);
+}

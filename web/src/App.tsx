@@ -2,8 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { InvalidSession, Main, Sidebar, StatusBar, TopBar, type Screen } from './components/Shell';
 import { api, ApiError, SessionExpiredError } from './lib/api';
 import { formatBytes } from './lib/format';
-import type { Config, LogLine, Overview, Progress, Status, Volume } from './lib/types';
+import type {
+  Config, ExportView, LogLine, Overview, Progress, Status, Volume,
+} from './lib/types';
 import { OverviewScreen } from './screens/OverviewScreen';
+import { ExportScreen } from './screens/ExportScreen';
+import { PasteScreen } from './screens/PasteScreen';
 import { RedactScreen } from './screens/RedactScreen';
 import { RulesScreen } from './screens/RulesScreen';
 import { ScanningScreen } from './screens/ScanningScreen';
@@ -31,6 +35,9 @@ export function App() {
   const [log, setLog] = useState<LogLine[]>([]);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [error, setError] = useState('');
+  const [batch, setBatch] = useState(1);
+  const [exportCode, setExportCode] = useState('');
+  const onExportLoaded = useCallback((view: ExportView) => setExportCode(view.code), []);
   const appElement = useRef<HTMLDivElement>(null);
 
   // Any rejected session (wrong or missing token) switches to the invalid-link state.
@@ -128,15 +135,13 @@ export function App() {
     if (result) setError('Relaunching as administrator. A new tab will open; close this one.');
   }, [guard]);
 
-  const reachedStep = overview ? 3 : 1;
+  const reachedStep = overview ? 5 : 1;
 
   const navigate = useCallback((target: Screen) => {
     if (target === 'scan' && screen === 'scanning') return;
-    if ((target === 'overview' || target === 'redact') && !overview) return;
-    if (target === 'scan' || target === 'overview' || target === 'redact' ||
-      target === 'rules') {
-      setScreen(target);
-    }
+    const needsScan: Screen[] = ['overview', 'redact', 'export', 'paste'];
+    if (needsScan.includes(target) && !overview) return;
+    if ([...needsScan, 'scan', 'rules'].includes(target)) setScreen(target);
   }, [screen, overview]);
 
   const startFromKeyboard = useCallback(() => {
@@ -154,6 +159,8 @@ export function App() {
     if (event.key === '1') navigate('scan');
     else if (event.key === '2') navigate('overview');
     else if (event.key === '3') navigate('redact');
+    else if (event.key === '4') navigate('export');
+    else if (event.key === '5') navigate('paste');
     else if (event.key === 'r' || event.key === 'R') navigate('rules');
     else if (event.key === 't' || event.key === 'T') toggleTheme();
     else if (event.key === 'Enter' && screen === 'scan' && target.tagName !== 'BUTTON') {
@@ -202,7 +209,8 @@ export function App() {
     <div class="app" ref={appElement}>
       <TopBar
         version={status.version}
-        sessionCode={progress?.sessionCode || overview?.sessionCode || status.sessionCode}
+        sessionCode={exportCode || progress?.sessionCode || overview?.sessionCode ||
+          status.sessionCode}
         crumb={crumbs[screen]}
         elevated={status.elevated}
         theme={theme}
@@ -260,9 +268,18 @@ export function App() {
             />
           )}
           {screen === 'redact' && (
-            <RedactScreen guard={guard} onOpenRules={() => setScreen('rules')} />
+            <RedactScreen guard={guard} onOpenRules={() => setScreen('rules')}
+              onContinue={() => setScreen('export')} />
           )}
           {screen === 'rules' && <RulesScreen guard={guard} />}
+          {screen === 'export' && (
+            <ExportScreen guard={guard} batch={batch} onBatchChange={setBatch}
+              onGoPaste={() => setScreen('paste')} onExportLoaded={onExportLoaded} />
+          )}
+          {screen === 'paste' && (
+            <PasteScreen guard={guard} batch={batch} onBatchChange={setBatch}
+              onGoExport={() => setScreen('export')} />
+          )}
         </Main>
       </div>
       <StatusBar

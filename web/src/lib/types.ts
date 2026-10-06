@@ -194,3 +194,61 @@ export interface RuleDraft {
   sessionCode?: string;
   fromNode?: number;
 }
+
+// Export and paste (internal/session/export.go, internal/response)
+export interface BatchView {
+  number: number;
+  firstId: number;
+  lastId: number;
+  lines: number;
+  items: number;
+  text: string;
+  characters: number;
+  tokenEstimate: number;
+  imported: boolean;
+  categoryCount: number;
+  classifiedItems: number;
+}
+
+export interface ExportView {
+  code: string;
+  batches: BatchView[];
+  items: number;
+  representedBytes: number;
+  unknownBytes: number;
+  minimumItemBytes: number;
+  stale: boolean;
+}
+
+export type CheckName = 'session' | 'complete' | 'format' | 'ids' | 'duplicates';
+
+export interface Problem {
+  line: number;
+  subject: string;
+  message: string;
+  check: CheckName;
+}
+
+export interface ParsedCategory {
+  name: string;
+  confidence: 'high' | 'med' | 'low';
+  regenerable: 'yes' | 'partially' | 'no';
+  deletable: boolean;
+  ids: number[];
+  line: number;
+}
+
+export interface PasteResult {
+  result: {
+    found: boolean;
+    foundCode: string;
+    truncated: boolean;
+    categories: ParsedCategory[];
+    problems: Problem[];
+    classified: number;
+  };
+  valid: boolean;
+  repair?: string;
+  imported: boolean;
+  export: ExportView;
+}
