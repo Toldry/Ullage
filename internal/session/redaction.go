@@ -283,7 +283,7 @@ var decisionNames = map[redact.Decision]string{
 
 var sourceNames = map[redact.Source]string{
 	redact.SourceNone: "", redact.SourceRule: "rule", redact.SourceSession: "session",
-	redact.SourceAlways: "always",
+	redact.SourceAlways:   "always",
 	redact.SourceAncestor: "ancestor",
 }
 
