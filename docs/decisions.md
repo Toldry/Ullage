@@ -200,3 +200,59 @@ Matches Windows Explorer, so numbers agree with what users see elsewhere on the 
 Strictly these are GiB; switching to decimal units is a one-line change.
 
 ### D-011: Design "Unreadable" and "Last-modified month" — see design-conflicts.md
+
+## Prompts and replies (Phase 3)
+
+### D-035: How the Unknown tier becomes lines — Reported (Phase 3)
+1. Forced splits: a folder that also holds Known or System bytes is split until every
+   item is purely Unknown, so an ID can never cover recipe or System data.
+2. Budgeted refinement: the largest remaining folder is replaced by its children of at
+   least the minimum size (default 100 MiB) plus a `folder/*` line for the rest, while
+   the item budget (default 900, about three batches) allows.
+3. A folder stays whole when its name already says what it holds (`node_modules`, `.git`,
+   `build`, `cache`, `Render Files`...), or when one file type makes up 80% of it and its
+   children are either more than 20 files or folders with generic names (years, months).
+Large things get detail; small or uniform ones stay one line. Thresholds are in
+`config.json` (`promptMinimumMegabytes`, `promptBatchLines`, `promptMaximumItems`).
+
+### D-036: Line notation — Reported (Phase 3)
+`ID SIZE PATH` then, when the name is shown: `xN` (same-named folders collapsed, one ID
+each as a range), `[N files]` (when more than one), `mYYYY-MM` (newest change inside),
+`cYYYY-MM` (created, omitted when equal to m), `{ext,ext}` (types with at least 10% of
+the bytes). `folder/*` is the rest of a folder not listed separately. Header lines hold
+shared prefixes, chosen by character cost. Redacted items show only ID, size and
+placeholder (D-030). Numeric and date-like names are never collapsed.
+
+### D-037: IDs are global; a reply is validated against the batch the user chose — Reported (Phase 3)
+IDs run continuously across batches, so a reply's IDs must lie inside the selected
+batch's range. The reply format stays exactly as specified (no batch field).
+
+### D-038: A rebuilt export gets a new session code — Reported (Phase 3)
+The first export uses the scan's code. If redactions change before any reply is
+imported, the export is rebuilt with a new code, so a reply to the superseded prompt is
+rejected as a session mismatch instead of being mapped onto different items. After an
+import, a redaction change marks the export stale; the import is kept until the user
+rebuilds explicitly.
+
+### D-039: What the parser tolerates — Reported (Phase 3)
+Tolerated: prose around the block, fences, bold markers, Markdown tables, bullets,
+blockquotes, smart quotes, typographic dashes in ranges, zero-width and non-breaking
+characters, CRLF, upper-case enums and headers, and the prompt pasted before the reply
+(the last `@END` and the `@SESSION` before it are used). Not tolerated: synonyms such as
+`medium` (the spec's enums are closed), names over 80 characters, rows without IDs. An
+empty block is valid and means nothing was recognized. Any problem blocks the import.
+
+### D-040: Names lose invisible format characters — Reported (Phase 3)
+Found by the injection test: a right-to-left override (U+202E) is a format character,
+not a control character, and can make `exe.txt` display as `txt.exe`. All Unicode
+format characters are replaced like control characters.
+
+### D-041: Deleting a `folder/*` item — Open for Phase 5
+Small files have no stored names (D-010). Deleting a loose-contents item will mean
+re-listing the folder at deletion time and removing what was not listed separately,
+under the same re-verification as every other item. To be designed in Phase 5.
+
+### D-042: Token estimates are offline approximations — Reported (Phase 3)
+The UI shows characters / 4. `tools/tokenestimate` (dev only) counts letter runs, digit
+runs and symbols; expect ±30%. A typical mixed PC (320 GB Unknown) produced 108 items in
+39 lines, about 1,300 tokens including instructions.

@@ -125,13 +125,17 @@ ullage/
 │   ├── overview/            numbers for the Overview screen
 │   ├── protect/             secret storage (DPAPI on Windows), fail closed
 │   ├── redact/              redaction rules, placeholders, path rendering
-│   ├── session/             per-launch state: scan, session code, log, redaction
+│   ├── prompt/              Unknown tier → numbered, redacted, batched prompt text
+│   ├── response/            tolerant reply extraction, strict validation, repair prompts
+│   ├── session/             per-launch state: scan, session code, log, redaction, export
 │   ├── server/              HTTP handlers, token/Host/Origin guard, SSE progress
 │   ├── storage/             config file, atomic writes
 │   └── nonetwork/           runtime guard that disables outbound HTTP and DNS
-│   (later phases add prompt/, response/, results/, deletion/, history/)
+│   ├── scanner/scannertest/ in-memory file system for tests
+│   (later phases add results/, deletion/, history/)
 ├── web/                     Preact + TypeScript UI; dist/ is embedded by package web
 ├── tools/nonetwork/         build check: forbids outbound network APIs (see §6)
+├── tools/tokenestimate/     DEV ONLY: token estimate for prompts of a sample scan
 ├── docs/                    this file, requirements, decisions, phase plan
 └── .github/workflows/       CI on Windows and Linux
 ```

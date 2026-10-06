@@ -8,7 +8,7 @@ for review. Status is updated as phases land.
 | 0 | Stack, architecture, plan | — | Done, approved |
 | 1 | Scanner, tiers, recipes, hardened server, Scan and Overview screens | Scanner fixtures, localhost security, no-network checks | Done, reviewed |
 | 2 | Redaction engine, encrypted rules store, redaction review and rules screens; dates, file types and non-developer recipes | Leak test, fail-closed test, rename-following | Done, approved |
-| 3 | Prompt builder, parser, validator, repair prompts, Export and Paste screens | Parser fixtures, injection, token estimator | In progress |
+| 3 | Prompt builder, parser, validator, repair prompts, Export and Paste screens | Parser fixtures, injection, token estimator | Done, awaiting review |
 | 4 | Results screen, round B explanations, low-confidence gating | Merge and sort, round B parser | Planned |
 | 5 | Deletion pipeline and confirmation screen | Guard refusals, change detection, partial failures | Planned |
 | 6 | History, all design states, packaging, Start menu shortcut, README | End-to-end on Windows CI | Planned |
@@ -95,3 +95,35 @@ Review outcome: D-030 and D-032 approved; D-027 and D-031 revised and implemente
   redactions (D-025 to D-030).
 - Redaction review screen (step 3) and rules manager screen with match counts.
 - Leak test over every rendered path, including descendants, usernames and machine name.
+
+## Phase 3 summary
+
+Built:
+
+- `prompt`: item selection (D-035), line notation and layout (D-036), batching with
+  general-audience instructions, exactly one worked example and short continuation
+  prompts for later batches.
+- `response`: tolerant extraction and normalization, strict validation, repair prompts
+  that ask for the full corrected reply (D-039).
+- Session and API: exports built on demand, failing closed while rules are unreadable;
+  new session code on rebuild (D-038); paste and import per batch.
+- Screens: Export prompt (step 4) with Clipboard API copy and select-all fallback, and
+  Paste response (step 5) with the checklist, problems, repair prompt and batch status.
+- `tools/tokenestimate`: dev-only offline estimate on a synthetic mixed PC or a real
+  folder (D-042).
+
+Tested:
+
+- Parser fixtures for every case the spec lists: preamble and postamble, fences, smart
+  quotes, truncation, wrong session, bad enums, overlapping IDs, unknown IDs, pipes in
+  category names, plus malformed and huge ranges, Markdown tables, bold markers and a
+  prompt pasted before the reply.
+- Prompt injection: hostile file names stay inside one data line and cannot open or close
+  a block or add columns; hostile replies cannot reference anything but enums and IDs of
+  the batch. Found and fixed a bidi-override spoofing gap (D-040).
+- Prompt-level leak test: redacted names, names inside redacted folders, the user name,
+  the machine name and SIDs never appear in any batch.
+- Purity (no ID covers Known or System bytes), budget, batching, determinism, the worked
+  example parses, redacted items carry only their size, content-aware rollup.
+- Session tests for the export lifecycle and fail-closed behavior; a headless Chromium run
+  of export, copy, a rejected paste and a successful import.
