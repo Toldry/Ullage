@@ -50,6 +50,8 @@ type DeletionItem struct {
 	Reason       string          `json:"reason,omitempty"`
 	// NowBytes is the size found on disk when it differs from the scan.
 	NowBytes int64 `json:"nowBytes,omitempty"`
+	// CloudSync: deleting it also deletes the cloud copy (decision D-052).
+	CloudSync bool `json:"cloudSync,omitempty"`
 }
 
 // Tally counts items and bytes.
@@ -138,7 +140,7 @@ func (manager *Manager) resolveSelection(keys []string) ([]DeletionItem,
 			targets[full] = targetFor(full, category, item)
 			items = append(items, DeletionItem{Key: full, Category: category.Key,
 				CategoryName: category.Name, Path: item.Path, Kind: item.Kind,
-				Bytes: item.Bytes})
+				Bytes: item.Bytes, CloudSync: item.CloudSync})
 		}
 	}
 	return items, targets, nil

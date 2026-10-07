@@ -158,12 +158,6 @@ func (guard *Guard) checkNode(target Target, index scanner.NodeIndex) (Status, s
 		return StatusProtected, "contains folders Ullage could not read, so it cannot verify them"
 	case node.Flags&scanner.FlagExcluded != 0:
 		return StatusProtected, "contains folders you excluded from the scan"
-	case node.Attributes&platform.AttributeManagedReparsePoint != 0:
-		return StatusProtected, "contains items managed by another program, such as a " +
-			"cloud-sync folder; deleting them could delete data elsewhere"
-	case node.NotLocalBytes > 0 || node.Attributes.NotStoredLocally():
-		return StatusProtected, "contains files that are only in the cloud; deleting them " +
-			"would delete the cloud copy and free nothing here"
 	}
 	return StatusReady, ""
 }

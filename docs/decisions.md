@@ -247,7 +247,7 @@ Found by the injection test: a right-to-left override (U+202E) is a format chara
 not a control character, and can make `exe.txt` display as `txt.exe`. All Unicode
 format characters are replaced like control characters.
 
-### D-041: Deleting a `folder/*` item — Resolved by D-053 (Phase 5)
+### D-041: Deleting a `folder/*` item — Resolved by D-053, approved (Phase 5)
 Small files have no stored names (D-010). Deleting a loose-contents item will mean
 re-listing the folder at deletion time and removing what was not listed separately,
 under the same re-verification as every other item. To be designed in Phase 5.
@@ -322,7 +322,7 @@ reports both locks (`needsExplanation`, `needsExpand`), so Phase 5 can enforce t
 
 ## Deletion (Phase 5)
 
-### D-051: What "unchanged since the scan" means — Reported (Phase 5)
+### D-051: What "unchanged since the scan" means — Approved (Phase 5 review)
 A re-walk of the item (links counted, never followed) must match the scan exactly in
 file count, folder count, link count, total logical size and newest modification time
 (of any file, folder or link inside); for a single file, allocated size too. Logical
@@ -333,24 +333,28 @@ item, and the reason says what changed. Every folder from the scanned root down 
 item must also still be the same folder (by file ID) and not a link, so a folder swapped
 for a junction after the scan cannot redirect the deletion.
 
-### D-052: What is never deleted, beyond the spec's list — Reported (Phase 5)
+### D-052: What is never deleted, beyond the spec's list — Revised on review (Phase 5)
 In addition to the System tier, the Windows folder and Program Files (safety rule 4):
 scanned roots as a whole; any user profile, the profiles folder, Ullage's configuration
 folder and every folder containing one; items containing anything of another tier or
 category (a recipe folder holding another recipe's folder, an AI folder holding a recipe
-folder); folders that were excluded or could not be read, which cannot be verified;
-cloud placeholders, whose deletion frees nothing here and deletes the cloud copy; and
-anything managed through a non-link reparse point, such as cloud-sync folders. That
-last one is new: the Windows directory reader now flags such entries.
+folder); and folders that were excluded or could not be read, which cannot be verified.
 
-### D-053: Deleting loose contents (`folder/*`) — Reported (Phase 5)
+Cloud-synced items (inside or holding a folder managed through a non-link reparse point,
+such as OneDrive) and cloud-only placeholders were refused at first. On review they are
+allowed, with a warning: a "cloud-synced" badge on the category, a note in its details
+saying how many items are affected and how much is only in the cloud (and frees nothing
+here), a line on each such item in the confirmation, and a summary note above the
+Recycle Bin and permanent options. The Windows directory reader flags such entries.
+
+### D-053: Deleting loose contents (`folder/*`) — Approved (Phase 5 review)
 A loose-contents item deletes the small files directly in the folder and the unlisted
 subfolders that belong entirely to its category. Listed items, links and subfolders
 mixing categories stay. Small files have no stored names, so they are verified in
 aggregate (count, logical size, newest modification); any new entry in the folder,
 including a new folder or link, blocks the item.
 
-### D-054: How the Recycle Bin is used — Reported (Phase 5)
+### D-054: How the Recycle Bin is used — Approved (Phase 5 review)
 Windows: `SHFileOperationW` with undo, no confirmation, no error UI and
 `FOF_WANTNUKEWARNING`, so when Windows cannot recycle something (too large for the bin,
 a drive without one) the shell asks before deleting permanently, and declining is
@@ -360,7 +364,7 @@ user can choose permanent deletion. Linux (for the future port): the freedesktop
 home Trash, only for items on the same file system. Free space returns when the bin is
 emptied, which the final screen says.
 
-### D-055: Permanent deletion — Reported (Phase 5)
+### D-055: Permanent deletion — Approved (Phase 5 review)
 Behind the typed confirmation `delete N` (N ready items), checked on the server, not
 only in the page. Folders are deleted by Ullage's own walk using the same directory
 reader as the scan, so junctions and symbolic links inside are removed as links and
@@ -368,19 +372,19 @@ their targets are never touched (tested with real junctions on Windows CI and sy
 links on Linux). A failure on one file does not stop the rest; the item is then
 reported as partly removed.
 
-### D-056: Plans and runs — Reported (Phase 5)
+### D-056: Plans and runs — Approved (Phase 5 review)
 Opening the confirmation creates a plan: every item verified, with an ID valid for 15
 minutes and usable once. Executing re-resolves the selection (a category that became
 unselectable is not deleted) and verifies each item again just before deleting it. One
 run at a time, in the background; failures do not stop it; "Stop after current item"
 skips the rest. A new scan cannot start during a run.
 
-### D-057: After deleting — Reported (Phase 5)
+### D-057: After deleting — Approved (Phase 5 review)
 Deleted items, recorded by scan node, leave the Results list (a category emptied by
 deleting disappears). The Overview keeps the scan's numbers until the next scan; Phase 6
 adds history of what was reclaimed.
 
-### D-058: What the browser may send — Reported (Phase 5)
+### D-058: What the browser may send — Approved (Phase 5 review)
 Selection keys name a category and an item of the current Results (`ai:3|id:42`,
 `recipe:npm-cache|node:17`, or `ai:3/rest` for items beyond the 200 listed). The server
 resolves them itself; a key that names nothing deletable is listed as refused with the

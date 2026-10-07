@@ -2601,3 +2601,21 @@ h1 {
 .dialog:focus {
   outline: none;
 }
+
+.cloud-badge {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 17px;
+  padding: 0 5px;
+  border: 1px solid var(--warn-bd);
+  border-radius: 3px;
+  color: var(--warn);
+}
+
+.cloud-note {
+  padding: 10px 12px;
+  border: 1px solid var(--warn-bd);
+  background: var(--warn-bg);
+  border-radius: 5px;
+}

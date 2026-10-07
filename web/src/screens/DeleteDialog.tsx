@@ -148,6 +148,19 @@ export function DeleteDialog({ guard, keys, volumeName, onClose }: Props) {
 
         {phase === 'confirm' && plan && plan.ready.count > 0 && (
           <div class="dialog-options">
+            {cloudCount(plan) > 0 && (
+              <div class="cloud-note small">
+                <span class="strong warn-text">
+                  {pluralize(cloudCount(plan), 'item')} {cloudCount(plan) === 1 ? 'is' : 'are'}{' '}
+                  cloud-synced.
+                </span>{' '}
+                <span class="muted">
+                  Deleting {cloudCount(plan) === 1 ? 'it' : 'them'} also deletes the cloud
+                  copy and the copies on your other devices; the cloud service may keep them
+                  in its own recycle bin for a while.
+                </span>
+              </div>
+            )}
             <div class="option-pair">
               <OptionCard selected={!permanent} onSelect={() => setPermanent(false)}
                 title="Move to Recycle Bin" hint="default"
@@ -244,6 +257,10 @@ export function DeleteDialog({ guard, keys, volumeName, onClose }: Props) {
   );
 }
 
+function cloudCount(plan: DeletionPlan): number {
+  return plan.items.filter((item) => item.status === 'ready' && item.cloudSync).length;
+}
+
 function sumBlocked(plan: DeletionPlan): number {
   return plan.items.filter((item) => item.status !== 'ready')
     .reduce((sum, item) => sum + item.bytes, 0);
@@ -301,6 +318,11 @@ function ItemRow({ item }: { item: DeletionItem }) {
         {item.reason && <span class={`small tone-text-${tone} wrap-text`}>{item.reason}</span>}
         {!item.reason && item.categoryName && (
           <span class="small faint ellipsis">{item.categoryName}</span>
+        )}
+        {item.cloudSync && (
+          <span class="small warn-text">
+            Cloud-synced: also deleted from the cloud and your other devices.
+          </span>
         )}
       </span>
       <span class="row-size cell-mono">

@@ -10,7 +10,7 @@ for review. Status is updated as phases land.
 | 2 | Redaction engine, encrypted rules store, redaction review and rules screens; dates, file types and non-developer recipes | Leak test, fail-closed test, rename-following | Done, approved |
 | 3 | Prompt builder, parser, validator, repair prompts, Export and Paste screens | Parser fixtures, injection, token estimator | Done, approved |
 | 4 | Results screen, round B explanations, low-confidence gating | Merge and sort, round B parser | Done, approved |
-| 5 | Deletion pipeline and confirmation screen | Guard refusals, change detection, partial failures | Done, awaiting review |
+| 5 | Deletion pipeline and confirmation screen | Guard refusals, change detection, partial failures | Done, approved |
 | 6 | History, all design states, packaging, Start menu shortcut, README | End-to-end on Windows CI | Planned |
 
 ## Phase 0 summary
@@ -204,3 +204,6 @@ Tested:
   confirmation; no console errors or remote requests.
 
 Deviations reported: D-051 to D-057; design conflicts 19 and 20.
+
+Review outcome: approved. Cloud-synced and cloud-only items became deletable with clear
+warnings instead of being refused (D-052).

@@ -319,6 +319,11 @@ function CategoryRow(props: {
           {category.restoredFrom && (
             <span class="restored-badge">restored from {category.restoredFrom}</span>
           )}
+          {category.cloudSyncItems > 0 && (
+            <span class="cloud-badge" title="Deleting also deletes the cloud copy">
+              cloud-synced
+            </span>
+          )}
         </span>
         <span class="results-size">
           <span class="results-bar"
@@ -435,6 +440,7 @@ function CategoryDetail(props: {
           <span class={`dot regen-${category.regenerable}`} />
           Regenerable: <span class="strong-500">{category.regenerable}</span>
         </div>
+        {category.cloudSyncItems > 0 && <CloudWarning category={category} />}
         {category.confidence === 'low' && !props.kept && (
           <div class="low-confidence-note small">
             <span class="strong bad-text">Low confidence.</span>{' '}
@@ -544,6 +550,23 @@ function CategoryDetail(props: {
   );
 }
 
+function CloudWarning({ category }: { category: ResultCategory }) {
+  const all = category.cloudSyncItems === category.itemCount;
+  return (
+    <div class="cloud-note small">
+      <span class="strong warn-text">Cloud-synced.</span>{' '}
+      <span class="muted">
+        {all ? 'These items are' : `${pluralize(category.cloudSyncItems, 'item')} of ` +
+          `${category.itemCount} ${category.cloudSyncItems === 1 ? 'is' : 'are'}`} in a
+        cloud-sync folder such as OneDrive. Deleting them here also deletes them from the
+        cloud and your other devices.
+        {category.notLocalBytes > 0 && ` ${formatBytes(category.notLocalBytes)} of it is ` +
+          'only in the cloud and frees no space on this PC.'}
+      </span>
+    </div>
+  );
+}
+
 function Field(props: { label: string; text: string }) {
   return (
     <div class="detail-field">
@@ -581,6 +604,7 @@ function ItemRow(props: {
     item.files > 1 ? pluralize(item.files, 'file') : null,
     item.modified ? `changed ${formatMonth(item.modified)}` : null,
     item.exportedAs ? `exported as ${item.exportedAs}` : null,
+    item.cloudSync ? 'cloud-synced' : null,
   ].filter(Boolean).join(' · ');
   return (
     <div class="item-row">

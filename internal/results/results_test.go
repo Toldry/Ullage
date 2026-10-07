@@ -305,3 +305,25 @@ func TestIDsMissingFromTheExportAreIgnored(t *testing.T) {
 		t.Fatalf("category with unknown IDs = %+v", ghost)
 	}
 }
+
+// Cloud-synced items stay deletable, but the category says how many there are.
+func TestCloudSyncedItemsAreFlagged(t *testing.T) {
+	fixture := newFixture(t)
+	fixture.importRows(t)
+	strata := scannertest.Find(t, fixture.result, "/c/Users/mara/AppData/Local/Strata")
+	fixture.result.Tree.Node(strata).Attributes |= platform.AttributeManagedReparsePoint
+	nested := scannertest.Find(t, fixture.result, "/c/Users/mara/AppData/Local/npm-cache")
+	fixture.result.Tree.Node(nested).NotLocalBytes = 5 * megabyte
+	model := Build(fixture.input)
+	if category := byKey(model, "ai:3"); category.CloudSyncItems != 1 ||
+		!category.Items[0].CloudSync {
+		t.Fatalf("cloud-synced AI item not flagged: %+v", category)
+	}
+	if npm := byKey(model, "recipe:npm-cache"); npm.CloudSyncItems != 1 ||
+		npm.NotLocalBytes != 5*megabyte {
+		t.Fatalf("cloud-only recipe item not flagged: %+v", npm)
+	}
+	if kestrel := byKey(model, "ai:1"); kestrel.CloudSyncItems != 0 {
+		t.Fatalf("unrelated category flagged: %+v", kestrel)
+	}
+}

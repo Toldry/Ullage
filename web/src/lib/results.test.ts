@@ -9,7 +9,7 @@ function category(key: string, overrides: Partial<ResultCategory> = {}): ResultC
     key, name: key, source: 'ai', confidence: 'high', regenerable: 'yes', bytes: 30,
     files: 3, itemCount: 2, root: '~/', moreItems: 0, moreBytes: 0,
     explanationState: 'received', bruteForce: { allowed: true }, needsExpand: false,
-    needsExplanation: false,
+    needsExplanation: false, cloudSyncItems: 0, notLocalBytes: 0,
     selectable: true,
     items: [
       { key: 'id:1', kind: 'folder', path: '~/a', bytes: 10, files: 1, modified: 0 },

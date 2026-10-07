@@ -21,10 +21,7 @@ type Fingerprint struct {
 	LogicalBytes   int64 `json:"logicalBytes"`
 	AllocatedBytes int64 `json:"allocatedBytes"`
 	Newest         int64 `json:"newest"`
-	// Managed counts entries another program manages (cloud-sync placeholders and other
-	// non-link reparse points); the scan side is always zero because the guard refuses them.
-	Managed    int64 `json:"managed"`
-	Unreadable bool  `json:"unreadable"`
+	Unreadable     bool  `json:"unreadable"`
 }
 
 // Check is the verdict on one target and, when ready, exactly what would be deleted.
@@ -214,7 +211,6 @@ func (print *Fingerprint) add(other Fingerprint) {
 	print.LogicalBytes += other.LogicalBytes
 	print.AllocatedBytes += other.AllocatedBytes
 	print.Newest = max(print.Newest, other.Newest)
-	print.Managed += other.Managed
 	print.Unreadable = print.Unreadable || other.Unreadable
 }
 
@@ -247,22 +243,12 @@ func (guard *Guard) diskFingerprint(disk *lister, target Target) (Fingerprint, [
 
 func fileFingerprint(entry platform.DirectoryEntry) Fingerprint {
 	return Fingerprint{Files: 1, LogicalBytes: entry.LogicalBytes,
-		AllocatedBytes: entry.AllocatedBytes, Newest: entry.ModifiedUnixNanos,
-		Managed: managed(entry)}
-}
-
-func managed(entry platform.DirectoryEntry) int64 {
-	if entry.Attributes&platform.AttributeManagedReparsePoint != 0 ||
-		entry.Attributes.NotStoredLocally() {
-		return 1
-	}
-	return 0
+		AllocatedBytes: entry.AllocatedBytes, Newest: entry.ModifiedUnixNanos}
 }
 
 // walk re-reads a folder the way the scan did: links are counted, never followed.
 func walk(disk *lister, path string, entry platform.DirectoryEntry) Fingerprint {
-	print := Fingerprint{Directories: 1, Newest: entry.ModifiedUnixNanos,
-		Managed: managed(entry)}
+	print := Fingerprint{Directories: 1, Newest: entry.ModifiedUnixNanos}
 	entries, err := disk.reader.ReadDirectory(path)
 	if err != nil {
 		print.Unreadable = true
@@ -274,7 +260,6 @@ func walk(disk *lister, path string, entry platform.DirectoryEntry) Fingerprint 
 		case platform.EntryFile:
 			print.Files++
 			print.LogicalBytes += child.LogicalBytes
-			print.Managed += managed(child)
 		case platform.EntryLink:
 			print.Links++
 		case platform.EntryDirectory:
@@ -312,7 +297,6 @@ func (guard *Guard) looseFingerprint(disk *lister, target Target, path string) (
 			print.Files++
 			print.LogicalBytes += entry.LogicalBytes
 			print.Newest = max(print.Newest, entry.ModifiedUnixNanos)
-			print.Managed += managed(entry)
 			paths = append(paths, childPath)
 		case !known:
 			return Fingerprint{}, nil, StatusChanged, entry.Name + " appeared after the scan"
@@ -341,10 +325,6 @@ func compareFingerprints(kind Kind, scan, now Fingerprint) (Status, string) {
 	var changes []string
 	if now.Unreadable {
 		changes = append(changes, "part of it can no longer be read")
-	}
-	if now.Managed > 0 {
-		changes = append(changes, "it now holds items managed by another program, such as "+
-			"cloud-sync placeholders")
 	}
 	if delta := now.Files - scan.Files; delta != 0 {
 		changes = append(changes, describeCount(delta, "file"))

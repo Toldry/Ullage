@@ -33,8 +33,8 @@ const (
 	AttributeHidden
 	AttributeSystem
 	// AttributeManagedReparsePoint marks an entry another program manages through a
-	// reparse point that is not a plain link, such as a cloud-sync folder. Deleting it
-	// may delete data elsewhere, so the deletion guard refuses it.
+	// reparse point that is not a plain link, such as a cloud-sync folder. Deleting it may
+	// delete data elsewhere too, so the Results screen warns about it.
 	AttributeManagedReparsePoint
 )
 

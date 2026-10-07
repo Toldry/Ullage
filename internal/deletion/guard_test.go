@@ -171,10 +171,6 @@ func TestUnverifiableScanStateIsRefused(t *testing.T) {
 			"excluded"},
 		{"denied", func(node *scanner.Node) { node.Flags |= scanner.FlagAccessDenied },
 			"could not read"},
-		{"cloud only", func(node *scanner.Node) { node.NotLocalBytes = 10 }, "cloud"},
-		{"managed", func(node *scanner.Node) {
-			node.Attributes |= platform.AttributeManagedReparsePoint
-		}, "managed by another program"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -228,6 +224,16 @@ func TestChangesSinceTheScanBlock(t *testing.T) {
 				testCase.status, testCase.reason)
 		})
 	}
+}
+
+// Cloud-synced and cloud-only items may be deleted (the Results screen warns about them).
+func TestCloudSyncedItemsAreAllowed(t *testing.T) {
+	fixture := newFixture(t)
+	src := fixture.result.Tree.Node(fixture.node(t, "Users/mara/projects/web/src"))
+	src.Attributes |= platform.AttributeManagedReparsePoint
+	src.NotLocalBytes = 10
+	expectStatus(t, fixture.guard.Verify(fixture.unknownFolder(t, "Users/mara/projects/web")),
+		StatusReady, "")
 }
 
 func TestChangedFileBlocks(t *testing.T) {

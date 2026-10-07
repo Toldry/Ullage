@@ -76,6 +76,10 @@ type Item struct {
 	Bytes      int64  `json:"bytes"`
 	Files      int64  `json:"files"`
 	Modified   int64  `json:"modified"`
+	// CloudSync: the item is or contains a cloud-synced or cloud-only entry. Deleting it
+	// also deletes the cloud copy, and cloud-only files free no space here.
+	CloudSync     bool  `json:"cloudSync,omitempty"`
+	NotLocalBytes int64 `json:"notLocalBytes,omitempty"`
 
 	// What deletion resolves the item to; never sent to the browser.
 	Node    scanner.NodeIndex   `json:"-"`
@@ -115,7 +119,10 @@ type Category struct {
 	// NeedsExplanation: an AI category whose round B explanation has not arrived. The user
 	// reads what is lost before anything the AI judged can be selected (decision D-050).
 	NeedsExplanation bool `json:"needsExplanation"`
-	Selectable       bool `json:"selectable"`
+	// CloudSyncItems counts items that are or contain cloud-synced entries (see Item).
+	CloudSyncItems int   `json:"cloudSyncItems"`
+	NotLocalBytes  int64 `json:"notLocalBytes"`
+	Selectable     bool  `json:"selectable"`
 }
 
 // Summary accounts for every scanned byte, so an empty result still explains itself.
@@ -244,10 +251,11 @@ func buildRecipeCategories(input Input) ([]Category, int64) {
 			if input.Deleted[DeletedKey(root, false)] {
 				continue
 			}
-			category.Items = append(category.Items, Item{Key: nodeKey(root),
-				Kind: itemKind(node.Kind, false), Bytes: bytes, Files: files,
-				Path: displayPath(input, root, false), Modified: modifiedOf(node),
-				Node: root, Tier: scanner.TierKnown, ClaimID: claimID})
+			category.Items = append(category.Items, withCloud(input.Tree, Item{
+				Key: nodeKey(root), Kind: itemKind(node.Kind, false), Bytes: bytes,
+				Files: files, Path: displayPath(input, root, false),
+				Modified: modifiedOf(node), Node: root, Tier: scanner.TierKnown,
+				ClaimID: claimID}))
 		}
 	}
 	var categories []Category
@@ -333,7 +341,7 @@ func buildAICategory(input Input, imported ImportedCategory, restorer *restorer)
 		if exported := renderedPath(input, item.Node, loose); strings.Contains(exported, "<R") {
 			entry.ExportedAs = exported
 		}
-		category.Items = append(category.Items, entry)
+		category.Items = append(category.Items, withCloud(input.Tree, entry))
 	}
 	finishItems(&category)
 	if received, found := input.Explanations[imported.Number]; found {
@@ -368,9 +376,14 @@ func finishItems(category *Category) {
 		return category.Items[first].Bytes > category.Items[second].Bytes
 	})
 	category.Bytes, category.Files = 0, 0
+	category.CloudSyncItems, category.NotLocalBytes = 0, 0
 	for _, item := range category.Items {
 		category.Bytes += item.Bytes
 		category.Files += item.Files
+		if item.CloudSync {
+			category.CloudSyncItems++
+			category.NotLocalBytes += item.NotLocalBytes
+		}
 	}
 	category.ItemCount = len(category.Items)
 	category.Root = commonDirectory(category.Items)
@@ -469,4 +482,39 @@ func DeletedKey(node scanner.NodeIndex, loose bool) string {
 		return "loose:" + itoa(int(node))
 	}
 	return "node:" + itoa(int(node))
+}
+
+// withCloud marks an item that is inside a cloud-synced folder, or is or holds a
+// cloud-synced folder or a cloud-only file. For loose contents only the folder's own files
+// and its unlisted children count below the folder.
+func withCloud(tree *scanner.Tree, item Item) Item {
+	for index := tree.Node(item.Node).Parent; index != scanner.NoNode; {
+		node := tree.Node(index)
+		if node.Attributes&platform.AttributeManagedReparsePoint != 0 {
+			item.CloudSync = true
+			break
+		}
+		index = node.Parent
+	}
+	listed := map[scanner.NodeIndex]bool{}
+	for _, index := range item.Listed {
+		listed[index] = true
+	}
+	stack := []scanner.NodeIndex{item.Node}
+	for len(stack) > 0 {
+		index := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		node := tree.Node(index)
+		if node.NotLocalBytes > 0 || node.Attributes.NotStoredLocally() ||
+			node.Attributes&platform.AttributeManagedReparsePoint != 0 {
+			item.CloudSync = true
+			item.NotLocalBytes += node.NotLocalBytes
+		}
+		for _, child := range node.Children {
+			if !(item.Kind == "loose" && index == item.Node && listed[child]) {
+				stack = append(stack, child)
+			}
+		}
+	}
+	return item
 }

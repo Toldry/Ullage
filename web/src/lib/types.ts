@@ -302,6 +302,8 @@ export interface ResultItem {
   bytes: number;
   files: number;
   modified: number;
+  cloudSync?: boolean;
+  notLocalBytes?: number;
 }
 
 export interface ResultCategory {
@@ -328,6 +330,8 @@ export interface ResultCategory {
   bruteForce: { allowed: boolean; reason?: string };
   needsExpand: boolean;
   needsExplanation: boolean;
+  cloudSyncItems: number;
+  notLocalBytes: number;
   selectable: boolean;
 }
 
@@ -364,6 +368,7 @@ export interface DeletionItem {
   status: DeletionStatus;
   reason?: string;
   nowBytes?: number;
+  cloudSync?: boolean;
 }
 
 export interface Tally {
