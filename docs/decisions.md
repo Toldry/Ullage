@@ -458,7 +458,8 @@ no-network check, then `ullage-<version>-windows-amd64.exe` and `-arm64.exe` (cg
 GUI subsystem, version stamped), a smoke test that the amd64 build starts and reports
 its version, a zip per architecture with the README and `THIRD-PARTY-NOTICES.txt`, and
 `SHA256SUMS.txt`. Build provenance is attested with GitHub's attestation action, so a
-download can be checked with `gh attestation verify`. The notices file is generated
+download can be checked with `gh attestation verify`; GitHub does not offer this for
+private personal repositories, so while the repository is private the step is skipped. The notices file is generated
 from the build graph (`scripts/notices.sh`): the Go standard library, every linked Go
 module, the npm runtime dependencies bundled into the UI, and the IBM Plex fonts (OFL).
 The executables are not Authenticode-signed (no certificate), so SmartScreen may warn

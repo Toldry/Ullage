@@ -70,7 +70,8 @@ flowchart LR
    by itself 15 minutes after the last tab closes.
 
 To verify a download, compare its checksum with `SHA256SUMS.txt` from the same
-release, and optionally check that GitHub built it from this repository:
+release. While the repository is public you can also check that GitHub built it from
+this repository:
 
 ```powershell
 Get-FileHash .\ullage-0.1.0-windows-amd64.exe -Algorithm SHA256
@@ -119,9 +120,9 @@ scripts\build.ps1           # PowerShell
 Push a version tag; the [Release workflow](.github/workflows/release.yml) tests
 everything, builds `amd64` and `arm64` executables, smoke-tests one, packages zips with
 the README and `THIRD-PARTY-NOTICES.txt`, writes `SHA256SUMS.txt`, attests build
-provenance and publishes the GitHub Release. A version with a suffix (`0.2.0-beta.1`)
-becomes a pre-release. Running the workflow by hand rehearses all of it without
-publishing.
+provenance (public repository only) and publishes the GitHub Release. A version with a
+suffix (`0.2.0-beta.1`) becomes a pre-release. Running the workflow by hand rehearses
+all of it without publishing.
 
 ```sh
 git tag v0.1.0

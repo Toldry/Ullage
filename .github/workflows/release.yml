@@ -113,7 +113,10 @@ jobs:
           (cd release && sha256sum ullage-* THIRD-PARTY-NOTICES.txt > SHA256SUMS.txt)
           cat release/SHA256SUMS.txt
 
+      # GitHub offers attestations for public repositories (and organizations' private
+      # ones); for a private personal repository the step is skipped, not failed.
       - name: Attest build provenance
+        if: ${{ !github.event.repository.private }}
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
@@ -132,19 +135,24 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
           PRERELEASE: ${{ steps.version.outputs.prerelease }}
+          PRIVATE: ${{ github.event.repository.private }}
         run: |
           cat > notes.md <<NOTES
           Download \`ullage-$VERSION-windows-amd64.exe\` (most PCs) or the \`arm64\` build
           for Windows on ARM, put it where you keep programs and run it. The \`.zip\` files
           hold the same executable with the README and third-party notices.
 
-          Verify a download against \`SHA256SUMS.txt\`, and check that GitHub built it from
-          this repository:
+          Verify a download against \`SHA256SUMS.txt\`.
+          NOTES
+          if [[ "$PRIVATE" != "true" ]]; then
+            cat >> notes.md <<NOTES
+          Check that GitHub built it from this repository:
 
           \`\`\`
           gh attestation verify ullage-$VERSION-windows-amd64.exe --repo $GITHUB_REPOSITORY
           \`\`\`
           NOTES
+          fi
           flags=()
           if [[ "$PRERELEASE" == "true" ]]; then flags+=(--prerelease); fi
           gh release create "$GITHUB_REF_NAME" release/* --verify-tag \
