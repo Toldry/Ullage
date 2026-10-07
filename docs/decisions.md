@@ -449,3 +449,17 @@ the browser does (launch link, cookie, token header, Origin): scan a temporary f
 export, import replies for both rounds, verify, recycle with the real Recycle Bin, and
 read the history. Browser-level runs (headless Chromium) are done during development;
 they are not part of CI, to keep it free of browser downloads.
+
+## Releases
+
+### D-065: Release artefacts — Reported
+A `v*` tag runs `.github/workflows/release.yml` on Windows: the full test suite and the
+no-network check, then `ullage-<version>-windows-amd64.exe` and `-arm64.exe` (cgo off,
+GUI subsystem, version stamped), a smoke test that the amd64 build starts and reports
+its version, a zip per architecture with the README and `THIRD-PARTY-NOTICES.txt`, and
+`SHA256SUMS.txt`. Build provenance is attested with GitHub's attestation action, so a
+download can be checked with `gh attestation verify`. The notices file is generated
+from the build graph (`scripts/notices.sh`): the Go standard library, every linked Go
+module, the npm runtime dependencies bundled into the UI, and the IBM Plex fonts (OFL).
+The executables are not Authenticode-signed (no certificate), so SmartScreen may warn
+on first run. A manual run rehearses everything without publishing.

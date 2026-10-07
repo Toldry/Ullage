@@ -37,7 +37,12 @@ func main() {
 		"create the Start menu shortcut and exit")
 	removeShortcut := flag.Bool("remove-shortcut", false,
 		"remove the Start menu shortcut and exit")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
 
 	var err error
 	switch {

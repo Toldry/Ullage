@@ -1,0 +1,151 @@
+name: Release
+
+# Pushing a tag like v0.1.0 builds, tests and publishes a GitHub Release. Running the
+# workflow by hand does everything except publishing, and keeps the files as workflow
+# artifacts, to rehearse a release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version for a rehearsal build, without the v (nothing is published)"
+        required: true
+        default: "0.0.0-rehearsal"
+
+permissions:
+  contents: write # create the release
+  id-token: write # sign the build provenance
+  attestations: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$INPUT_VERSION"
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$version' is not a version like 1.2.3 or 1.2.3-beta.1"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build and test the user interface
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+          npm test
+
+      - name: Test (a release is never built from a red tree)
+        run: |
+          go vet ./...
+          go test -race ./...
+          go run ./tools/nonetwork .
+
+      - name: Build executables
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          CGO_ENABLED: "0"
+        run: |
+          mkdir -p release
+          for arch in amd64 arm64; do
+            GOOS=windows GOARCH=$arch go build -trimpath \
+              -ldflags "-H windowsgui -s -w -X main.version=$VERSION" \
+              -o "release/ullage-$VERSION-windows-$arch.exe" ./cmd/ullage
+          done
+
+      - name: Smoke test the amd64 executable
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # The release build has no console, so its output is redirected to a file.
+          $exe = "release/ullage-$env:VERSION-windows-amd64.exe"
+          $process = Start-Process -FilePath $exe -ArgumentList "--version" -Wait -PassThru `
+            -RedirectStandardOutput version.txt -NoNewWindow
+          $printed = (Get-Content version.txt -Raw).Trim()
+          if ($process.ExitCode -ne 0 -or $printed -ne $env:VERSION) {
+            throw "smoke test failed: exit $($process.ExitCode), printed '$printed'"
+          }
+
+      - name: Package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          scripts/notices.sh release/THIRD-PARTY-NOTICES.txt
+          for arch in amd64 arm64; do
+            folder="staging/ullage-$VERSION-windows-$arch"
+            mkdir -p "$folder"
+            cp "release/ullage-$VERSION-windows-$arch.exe" "$folder/ullage.exe"
+            cp README.md release/THIRD-PARTY-NOTICES.txt "$folder/"
+            (cd staging && 7z a -tzip -mx=9 "../release/ullage-$VERSION-windows-$arch.zip" \
+              "ullage-$VERSION-windows-$arch" > /dev/null)
+          done
+          (cd release && sha256sum ullage-* THIRD-PARTY-NOTICES.txt > SHA256SUMS.txt)
+          cat release/SHA256SUMS.txt
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            release/*.exe
+            release/*.zip
+
+      - name: Keep the files as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ullage-${{ steps.version.outputs.version }}
+          path: release/
+
+      - name: Publish the release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          cat > notes.md <<NOTES
+          Download \`ullage-$VERSION-windows-amd64.exe\` (most PCs) or the \`arm64\` build
+          for Windows on ARM, put it where you keep programs and run it. The \`.zip\` files
+          hold the same executable with the README and third-party notices.
+
+          Verify a download against \`SHA256SUMS.txt\`, and check that GitHub built it from
+          this repository:
+
+          \`\`\`
+          gh attestation verify ullage-$VERSION-windows-amd64.exe --repo $GITHUB_REPOSITORY
+          \`\`\`
+          NOTES
+          flags=()
+          if [[ "$PRERELEASE" == "true" ]]; then flags+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" release/* --verify-tag \
+            --title "Ullage $VERSION" --notes-file notes.md --generate-notes "${flags[@]}"

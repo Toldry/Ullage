@@ -60,17 +60,32 @@ flowchart LR
 
 ## Install and run
 
-1. Download `ullage.exe` (one file, no installer) and put it where you keep programs,
-   for example `%LOCALAPPDATA%\Programs\Ullage\`.
+1. Download `ullage-<version>-windows-amd64.exe` from
+   [Releases](https://github.com/Toldry/Ullage/releases) (`arm64` for Windows on ARM).
+   It is one file, with no installer. Put it where you keep programs, for example
+   `%LOCALAPPDATA%\Programs\Ullage\`, and you may rename it to `ullage.exe`.
 2. Run it. Your browser opens on a local, one-time link. The first run adds
    **Ullage** to the Start menu.
 3. Running it again while it is open just opens a new tab of the same session. It exits
    by itself 15 minutes after the last tab closes.
 
+To verify a download, compare its checksum with `SHA256SUMS.txt` from the same
+release, and optionally check that GitHub built it from this repository:
+
+```powershell
+Get-FileHash .\ullage-0.1.0-windows-amd64.exe -Algorithm SHA256
+gh attestation verify .\ullage-0.1.0-windows-amd64.exe --repo Toldry/Ullage
+```
+
+```sh
+sha256sum -c SHA256SUMS.txt --ignore-missing
+gh attestation verify ullage-0.1.0-windows-amd64.exe --repo Toldry/Ullage
+```
+
 To read folders that need administrator rights, use *Relaunch as administrator* on the
 Scan screen.
 
-Command line options: `--no-browser` prints the link instead of opening it;
+Command line options: `--version`; `--no-browser` prints the link instead of opening it;
 `--install-shortcut` and `--remove-shortcut` manage the Start menu entry.
 
 ### Where Ullage keeps data
@@ -97,6 +112,20 @@ scripts/build.sh            # Linux, macOS, Git Bash
 
 ```powershell
 scripts\build.ps1           # PowerShell
+```
+
+## Releasing
+
+Push a version tag; the [Release workflow](.github/workflows/release.yml) tests
+everything, builds `amd64` and `arm64` executables, smoke-tests one, packages zips with
+the README and `THIRD-PARTY-NOTICES.txt`, writes `SHA256SUMS.txt`, attests build
+provenance and publishes the GitHub Release. A version with a suffix (`0.2.0-beta.1`)
+becomes a pre-release. Running the workflow by hand rehearses all of it without
+publishing.
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
 ## Testing

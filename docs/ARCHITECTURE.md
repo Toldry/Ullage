@@ -141,9 +141,9 @@ ullage/
 ├── web/                     Preact + TypeScript UI; dist/ is embedded by package web
 ├── tools/nonetwork/         build check: forbids outbound network APIs (see §6)
 ├── tools/tokenestimate/     DEV ONLY: token estimate for prompts of a sample scan
-├── scripts/                 build.sh and build.ps1 for the release executable
+├── scripts/                 build scripts and the third-party notices generator
 ├── docs/                    this file, requirements, decisions, phase plan
-└── .github/workflows/       CI on Windows and Linux
+└── .github/workflows/       CI on Windows and Linux; release on version tags
 ```
 
 Rules for dependencies between packages: `prompt` and `response` never import `deletion`;
