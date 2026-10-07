@@ -104,7 +104,10 @@ type Category struct {
 	BruteForce       BruteForce       `json:"bruteForce"`
 	// NeedsExpand: a low-confidence category whose row the user has not opened yet.
 	NeedsExpand bool `json:"needsExpand"`
-	Selectable  bool `json:"selectable"`
+	// NeedsExplanation: an AI category whose round B explanation has not arrived. The user
+	// reads what is lost before anything the AI judged can be selected (decision D-050).
+	NeedsExplanation bool `json:"needsExplanation"`
+	Selectable       bool `json:"selectable"`
 }
 
 // Summary accounts for every scanned byte, so an empty result still explains itself.
@@ -328,7 +331,9 @@ func buildAICategory(input Input, imported ImportedCategory, restorer *restorer)
 	}
 	category.NeedsExpand = row.Confidence == response.ConfidenceLow &&
 		!input.Expanded[category.Key]
-	category.Selectable = row.Deletable && !category.NeedsExpand && category.Bytes > 0
+	category.NeedsExplanation = category.ExplanationState != ExplanationReceived
+	category.Selectable = row.Deletable && !category.NeedsExpand &&
+		!category.NeedsExplanation && category.Bytes > 0
 	return category
 }
 

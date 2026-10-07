@@ -81,9 +81,11 @@ func TestResultsAfterRoundA(t *testing.T) {
 	if !notes.NeedsExpand || notes.Selectable || !strings.Contains(notes.Name, "zorblax") {
 		t.Fatalf("low confidence category = %+v", notes)
 	}
+	// Expanding clears the low-confidence lock; the explanation lock (D-050) remains.
 	expanded, err := manager.MarkExpanded("ai:1")
-	if err != nil || !findCategory(expanded, "ai:1").Selectable {
-		t.Fatalf("expanding did not unlock: %v", err)
+	if unlocked := findCategory(expanded, "ai:1"); err != nil || unlocked.NeedsExpand ||
+		!unlocked.NeedsExplanation || unlocked.Selectable {
+		t.Fatalf("after expanding: %+v %v", unlocked, err)
 	}
 	if _, err := manager.MarkExpanded("ai:99"); !errors.Is(err, ErrNoSuchCategory) {
 		t.Fatalf("expanding an unknown category: %v", err)
@@ -143,6 +145,10 @@ func TestRoundBExplanations(t *testing.T) {
 		findCategory(resultsView, "ai:3").ExplanationState != results.ExplanationQueued ||
 		resultsView.QueuedCount != 1 || resultsView.ExplanationRound != 3 {
 		t.Fatalf("results after round B = %+v", resultsView)
+	}
+	if expanded, _ := manager.MarkExpanded("ai:1"); !findCategory(expanded,
+		"ai:1").Selectable {
+		t.Fatalf("explained and expanded category not selectable: %+v", expanded)
 	}
 	if _, err := manager.RequestExplanation(ExplanationRequest{Number: 1,
 		Queued: true}); err == nil {

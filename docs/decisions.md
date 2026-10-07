@@ -312,10 +312,10 @@ The selection is kept in the page and pruned when results change; "Review deleti
 disabled until step 7 exists. Phase 5 will send the selected keys and re-resolve every
 one on the server.
 
-### D-050: AI categories without an explanation stay selectable — Needs review (Phase 4)
+### D-050: AI categories need an explanation before delete — Approved (Phase 4 review)
 The design says "Cleanup methods arrive with the explanation. Until then these items
-can't be selected." The spec makes explanations lazy and gates only low confidence.
-Following the spec, a `del 1` category can be selected without an explanation; its row
-offers "Request explanation". Requiring an explanation before any AI deletion would be
-the stricter choice, at the cost of a round B for every category. See design conflict
-16.
+can't be selected." The spec only gates low confidence; on review the stricter design
+rule was adopted. An AI category can be selected only after its round B explanation has
+been imported, so the user has read what is lost; a low-confidence one must also have
+been opened. Recipe categories carry their explanation and are not affected. The server
+reports both locks (`needsExplanation`, `needsExpand`), so Phase 5 can enforce them.

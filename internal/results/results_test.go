@@ -235,9 +235,18 @@ func TestRealNamesRestoredForDisplayOnly(t *testing.T) {
 	}
 }
 
+func explain(fixture *fixture, numbers ...int) {
+	for _, number := range numbers {
+		fixture.input.Explanations[number] = ReceivedExplanation{Round: 2,
+			Explanation: response.Explanation{Number: number, What: "w", Lost: "l",
+				Steps: []string{"s"}}}
+	}
+}
+
 func TestLowConfidenceNeedsExpandBeforeDelete(t *testing.T) {
 	fixture := newFixture(t)
 	fixture.importRows(t)
+	explain(&fixture, 1, 3)
 	locked := byKey(Build(fixture.input), "ai:3")
 	if !locked.NeedsExpand || locked.Selectable {
 		t.Fatalf("low confidence category is selectable before expanding: %+v", locked)
@@ -249,6 +258,28 @@ func TestLowConfidenceNeedsExpandBeforeDelete(t *testing.T) {
 	}
 	if high := byKey(Build(fixture.input), "ai:1"); high.NeedsExpand || !high.Selectable {
 		t.Fatalf("high confidence category locked: %+v", high)
+	}
+}
+
+// Decision D-050: nothing the AI judged is selectable before its explanation arrives.
+func TestAICategoriesNeedAnExplanationBeforeDelete(t *testing.T) {
+	fixture := newFixture(t)
+	fixture.importRows(t)
+	fixture.input.Expanded["ai:3"] = true
+	fixture.input.Queued[1] = true
+	model := Build(fixture.input)
+	for _, key := range []string{"ai:1", "ai:3"} {
+		if category := byKey(model, key); !category.NeedsExplanation || category.Selectable {
+			t.Fatalf("%s selectable without an explanation: %+v", key, category)
+		}
+	}
+	if nuget := byKey(model, "recipe:nuget"); nuget.NeedsExplanation || !nuget.Selectable {
+		t.Fatalf("recipe category locked: %+v", nuget)
+	}
+	explain(&fixture, 1)
+	if category := byKey(Build(fixture.input), "ai:1"); category.NeedsExplanation ||
+		!category.Selectable {
+		t.Fatalf("explained category still locked: %+v", category)
 	}
 }
 

@@ -327,6 +327,7 @@ export interface ResultCategory {
   explanationState: 'recipe' | 'none' | 'queued' | 'received';
   bruteForce: { allowed: boolean; reason?: string };
   needsExpand: boolean;
+  needsExplanation: boolean;
   selectable: boolean;
 }
 

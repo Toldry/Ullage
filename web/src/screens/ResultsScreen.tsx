@@ -289,7 +289,8 @@ function CategoryRow(props: {
   const single = category.itemCount === 1 ? category.items[0] : undefined;
   const checkboxTitle = props.kept ? 'The AI suggests keeping these'
     : !category.bruteForce.allowed ? 'Managed cleanup only'
-      : category.needsExpand ? 'Expand the row to enable delete' : 'Select for deletion';
+      : category.needsExplanation ? 'Request an explanation first'
+        : category.needsExpand ? 'Expand the row to enable delete' : 'Select for deletion';
   return (
     <>
       <div role="row" tabIndex={-1}
@@ -353,7 +354,6 @@ function RowAction(props: {
   const { category } = props;
   if (props.kept) return <span class="faint">AI suggests keeping</span>;
   if (!category.bruteForce.allowed) return <span class="faint">Managed cleanup only</span>;
-  if (category.needsExpand) return <span class="faint">Expand to enable delete</span>;
   if (category.explanationState === 'queued') {
     return <span class="cell-mono muted">queued · round {props.round}</span>;
   }
@@ -365,6 +365,7 @@ function RowAction(props: {
       </button>
     );
   }
+  if (category.needsExpand) return <span class="faint">Expand to enable delete</span>;
   return null;
 }
 
@@ -430,8 +431,10 @@ function CategoryDetail(props: {
           <div class="low-confidence-note small">
             <span class="strong bad-text">Low confidence.</span>{' '}
             <span class="muted">
-              Delete stays off until a row like this has been opened. It is enabled now;
-              check the items on the right first.
+              Delete stays off until a row like this has been opened.{' '}
+              {category.needsExplanation
+                ? 'It also needs the explanation; request it first.'
+                : 'It is enabled now; check the items on the right first.'}
             </span>
           </div>
         )}
@@ -459,7 +462,12 @@ function CategoryDetail(props: {
             {explanation.note && <div class="small muted managed-note">{explanation.note}</div>}
           </div>
         )}
-        {props.kept ? (
+        {!props.kept && category.needsExplanation ? (
+          <div class="small faint">
+            Cleanup methods arrive with the explanation. Until then these items can't be
+            selected.
+          </div>
+        ) : props.kept ? (
           <div class="cleanup-box dashed">
             <div class="between">
               <span class="strong muted">Brute force</span>

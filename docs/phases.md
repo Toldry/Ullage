@@ -9,7 +9,7 @@ for review. Status is updated as phases land.
 | 1 | Scanner, tiers, recipes, hardened server, Scan and Overview screens | Scanner fixtures, localhost security, no-network checks | Done, reviewed |
 | 2 | Redaction engine, encrypted rules store, redaction review and rules screens; dates, file types and non-developer recipes | Leak test, fail-closed test, rename-following | Done, approved |
 | 3 | Prompt builder, parser, validator, repair prompts, Export and Paste screens | Parser fixtures, injection, token estimator | Done, approved |
-| 4 | Results screen, round B explanations, low-confidence gating | Merge and sort, round B parser | Done, awaiting review |
+| 4 | Results screen, round B explanations, low-confidence gating | Merge and sort, round B parser | Done, approved |
 | 5 | Deletion pipeline and confirmation screen | Guard refusals, change detection, partial failures | Planned |
 | 6 | History, all design states, packaging, Start menu shortcut, README | End-to-end on Windows CI | Planned |
 
@@ -161,4 +161,7 @@ Tested:
   export and paste, explanation shown, dark and light themes; no console errors, CSP
   violations or remote requests.
 
-Deviations reported: D-043 to D-050; design conflicts 15 to 18. D-050 needs a decision.
+Deviations reported: D-043 to D-050; design conflicts 15 to 18.
+
+Review outcome: approved; D-050 resolved the strict way (an AI category needs its
+explanation before it can be selected).

@@ -21,6 +21,6 @@ Each conflict below was reported when found.
 | 13 | Redaction review lists small files (88 KB) as rows | Small files are aggregated; their names are never stored or sent (D-010) | Shown as "N small files (names never sent)" (D-032) | Phase 2 |
 | 14 | "Always applied" mentions drive serials | Not applicable: serial numbers are never part of a prompt | Text lists profile, account names, machine name and SIDs | Phase 2 |
 | 15 | AI categories show copyable `$ command` cleanup lines | Safety rule 3: the AI never authors actions | AI steps are plain text; only recipe steps have commands (D-046) | Phase 4 |
-| 16 | AI items cannot be selected until an explanation arrives | Explanations are lazy; only low confidence gates delete | Selectable without an explanation; flagged for review (D-050) | Phase 4 |
+| 16 | AI items cannot be selected until an explanation arrives | Explanations are lazy; only low confidence gates delete | Design rule adopted on review (D-050) | Phase 4 |
 | 17 | Empty state offers "Lower threshold to 10 MB" and "Scan D: instead" | Changing the threshold rebuilds the prompt and discards imported replies | "Scan again" and "Browse classified items"; the threshold stays in settings | Phase 4 |
 | 18 | WSL distro images listed as "recipes say keep" | The WSL recipe has managed cleanup steps | Listed as "Managed cleanup only", like Docker | Phase 4 |
