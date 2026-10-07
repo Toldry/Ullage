@@ -130,6 +130,7 @@ ullage/
 │   ├── results/             recipe + AI categories merged, names restored for display
 │   ├── deletion/            guard, re-verification, Recycle Bin / permanent delete
 │   ├── history/             encrypted, path-free record of past sessions
+│   ├── applog/              daily log files; callers pass only redacted text
 │   ├── instance/            single instance through a per-user named pipe
 │   ├── e2e/                 API end-to-end test over loopback (test only)
 │   ├── session/             per-launch state: scan, code, log, redaction, export, results
@@ -299,6 +300,7 @@ All under the current user's profile. Nothing is written next to the executable.
 | Config (theme, batch budget, last roots) | `%APPDATA%\Ullage\config.json`   | Plain (no paths of redacted items) |
 | Redaction rules + placeholder map | `%APPDATA%\Ullage\rules.dpapi`          | DPAPI, current user |
 | History (dates, drives, bytes, counts; no paths) | `%LOCALAPPDATA%\Ullage\history.dpapi` | DPAPI, current user |
+| Logs (14 days)           | `%LOCALAPPDATA%\Ullage\logs\ullage-YYYYMMDD.log` | Paths rendered through the redactor; withheld when that is impossible |
 | Start menu shortcut      | `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Ullage.lnk` | - |
 | Scan data                | In memory only; discarded when the process exits | -                   |
 

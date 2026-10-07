@@ -94,6 +94,8 @@ func (manager *Manager) currentExport(forceRebuild bool) (*prompt.Export, bool, 
 	state.redactionVersion = manager.redaction.version
 	state.imports = map[int]BatchImport{}
 	state.explanations = newExplanationState()
+	manager.logf("export", "built %s: %d batches, %d items, %d of %d Unknown bytes listed",
+		code, len(built.Batches), len(built.Items), built.RepresentedBytes, built.UnknownBytes)
 	// Keep the placeholder numbers this prompt used for later sessions (D-034). A failed
 	// save only affects numbering next time, never what this prompt contains.
 	_ = manager.saveRules()
@@ -179,6 +181,8 @@ func (manager *Manager) Paste(request PasteRequest) (PasteResult, error) {
 		BatchCount: len(export.Batches), FirstID: batch.FirstID, LastID: batch.LastID}
 	parsed := response.Parse(request.Text, expectation)
 	result := PasteResult{Result: parsed, Valid: parsed.Valid()}
+	manager.logf("paste", "batch %d of %s: %s, %d categories, %d items, %d problems",
+		batch.Number, export.Code, map[bool]string{true: "imported", false: "rejected"}[result.Valid], len(parsed.Categories), parsed.Classified, len(parsed.Problems))
 	if result.Valid {
 		manager.importBatch(batch.Number, parsed.Categories)
 		result.Imported = true

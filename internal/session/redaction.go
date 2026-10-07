@@ -511,7 +511,12 @@ func (manager *Manager) SaveRule(request RuleRequest) (redact.Rule, error) {
 		rules = append(append(append([]redact.Rule{}, rules[:position]...), rule),
 			rules[position+1:]...)
 	}
-	return rule, manager.commitRules(rules)
+	if err := manager.commitRules(rules); err != nil {
+		return rule, err
+	}
+	// The pattern itself may name what the user is hiding, so only its kind is logged.
+	manager.logf("rules", "saved a %s rule (%d rules)", rule.Type, len(rules))
+	return rule, nil
 }
 
 func (manager *Manager) fillRuleFromNode(rule *redact.Rule, request RuleRequest) error {
@@ -551,8 +556,12 @@ func (manager *Manager) DeleteRule(id string) error {
 	if position < 0 {
 		return errors.New("no rule with this id")
 	}
-	return manager.commitRules(append(append([]redact.Rule{}, rules[:position]...),
-		rules[position+1:]...))
+	if err := manager.commitRules(append(append([]redact.Rule{}, rules[:position]...),
+		rules[position+1:]...)); err != nil {
+		return err
+	}
+	manager.logf("rules", "deleted a rule (%d left)", len(rules)-1)
+	return nil
 }
 
 func ruleIndex(rules []redact.Rule, id string) int {
@@ -590,5 +599,6 @@ func (manager *Manager) ResetUnreadableRules() (string, error) {
 	}
 	manager.loadRules()
 	manager.resetRedactionForNewScan()
+	manager.logf("rules", "unreadable rules file set aside at the user's request")
 	return aside, manager.redaction.loadError
 }

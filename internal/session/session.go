@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/toldry/ullage/internal/applog"
 	"github.com/toldry/ullage/internal/deletion"
 	"github.com/toldry/ullage/internal/history"
 	"github.com/toldry/ullage/internal/overview"
@@ -58,6 +59,8 @@ type Environment struct {
 	// HistoryPath is the session history file; empty means history.dpapi in the config
 	// directory.
 	HistoryPath string
+	// Logger writes the log files; nil logs nothing.
+	Logger *applog.Logger
 }
 
 // NativeEnvironment wires the real platform implementation.
@@ -144,6 +147,10 @@ type Manager struct {
 	exportState exportState
 	deletion    deletionState
 	history     *history.Store
+	// pendingEvents are scan events held back from the log file until the scan finishes
+	// and their paths can be rendered through the redactor.
+	pendingEvents []scanner.Event
+	droppedEvents int
 }
 
 // NewManager loads the recipe library and saved config.
@@ -263,6 +270,10 @@ func (manager *Manager) StartScan(request ScanRequest) error {
 		classifier: classifier, volumes: volumes, expected: expected}
 	manager.state = StateRunning
 	manager.failure = ""
+	manager.pendingEvents, manager.droppedEvents = nil, 0
+	manager.logf("scan", "started %s: %d %s, other profiles %t, %d exclusions", code,
+		len(roots), pluralWord(len(roots), "root", "roots"), request.IncludeOtherProfiles,
+		len(manager.config.Exclusions))
 	go manager.awaitScan(manager.current, restorePriority)
 	return nil
 }
@@ -358,9 +369,15 @@ func (manager *Manager) awaitScan(current *running, restorePriority func()) {
 	switch {
 	case errors.Is(err, context.Canceled):
 		manager.state = StateCancelled
+		manager.logf("scan", "cancelled %s", current.code)
+		manager.pendingEvents = nil
 	case err != nil:
 		manager.state = StateFailed
 		manager.failure = err.Error()
+		// No tree, so no path can be rendered: the error text is logged without paths.
+		manager.logf("scan", "failed %s: %s", current.code, manager.scrub(err.Error(),
+			func(string) string { return pathWithheld }))
+		manager.pendingEvents = nil
 	default:
 		progress := current.scan.Snapshot()
 		manager.completed = &Completed{
@@ -377,6 +394,7 @@ func (manager *Manager) awaitScan(current *running, restorePriority func()) {
 		manager.resetRedactionForNewScan()
 		manager.deletion = deletionState{}
 		manager.recordScan()
+		manager.logScanFinished(progress)
 	}
 }
 
@@ -472,6 +490,11 @@ func (manager *Manager) LogSince(sequence int64) []LogLine {
 func (manager *Manager) recordEvent(event scanner.Event) {
 	manager.lock.Lock()
 	log := manager.log
+	if len(manager.pendingEvents) < maximumPendingEvents {
+		manager.pendingEvents = append(manager.pendingEvents, event)
+	} else {
+		manager.droppedEvents++
+	}
 	manager.lock.Unlock()
 	log.add(LogLine{
 		Time:  event.Time,

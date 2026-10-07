@@ -247,7 +247,11 @@ func (manager *Manager) PrepareDeletion(keys []string) (DeletionPlan, error) {
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 	manager.deletion.plan = plan
-	return planView(plan), nil
+	view := planView(plan)
+	manager.logf("delete", "verified %d: %d ready, %d changed, %d missing, %d refused",
+		len(items), view.Ready.Count, view.Changed.Count, view.Missing.Count,
+		view.Refused.Count)
+	return view, nil
 }
 
 func planView(plan *deletionPlan) DeletionPlan {
@@ -360,9 +364,23 @@ func (manager *Manager) recordDeleted(run *deletion.Run) {
 		manager.deletion.deleted = map[string]bool{}
 	}
 	manager.deletion.recorded = true
-	manager.recordDeletion(manager.runView())
+	view := manager.runView()
+	manager.recordDeletion(view)
 	manager.deletion.recorded = false
 	state := run.State()
+	for index, outcome := range state.Outcomes {
+		line := string(outcome.Status) + " " + manager.safeNode(run.Targets()[index].Node)
+		if run.Targets()[index].Kind == deletion.KindLoose {
+			line += "/*"
+		}
+		if outcome.Reason != "" {
+			line += ": " + manager.safeText(outcome.Reason)
+		}
+		manager.environment.Logger.Write("delete", line)
+	}
+	manager.logf("delete", "%s finished: %d removed (%d bytes), %d failed, %d skipped",
+		map[bool]string{true: "permanent deletion", false: "recycling"}[view.Permanent],
+		view.Removed.Count, view.Removed.Bytes, view.Failed.Count, view.Skipped.Count)
 	for index, outcome := range state.Outcomes {
 		if outcome.Status == deletion.StatusRecycled || outcome.Status == deletion.StatusDeleted {
 			target := run.Targets()[index]

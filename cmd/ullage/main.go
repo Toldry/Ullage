@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/toldry/ullage/internal/applog"
 	"github.com/toldry/ullage/internal/instance"
 	"github.com/toldry/ullage/internal/nonetwork"
 	"github.com/toldry/ullage/internal/platform"
@@ -107,10 +108,17 @@ func run(noBrowser bool) error {
 	if dataDirectory, err := platform.DataDirectory(); err == nil {
 		environment.HistoryPath = filepath.Join(dataDirectory, "history.dpapi")
 	}
+	if logDirectory, err := platform.LogDirectory(); err == nil {
+		environment.Logger = applog.Open(logDirectory)
+		defer environment.Logger.Close()
+	}
 	manager, err := session.NewManager(environment)
 	if err != nil {
 		return err
 	}
+	manager.Log("start", fmt.Sprintf("Ullage %s on %s, elevated %t", version, platform.Name,
+		platform.IsElevated()))
+	defer manager.Log("stop", "exiting")
 	if manager.FirstRun() && platform.Name == "windows" && !isTemporaryBuild() {
 		// Best effort: the app works the same without a Start menu entry.
 		_ = installStartMenuShortcut()

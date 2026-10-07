@@ -80,10 +80,11 @@ Command line options: `--no-browser` prints the link instead of opening it;
 | Settings | `%APPDATA%\Ullage\config.json` |
 | Redaction rules (encrypted, DPAPI) | `%APPDATA%\Ullage\rules.dpapi` |
 | History: dates, drives and sizes, no paths (encrypted, DPAPI) | `%LOCALAPPDATA%\Ullage\history.dpapi` |
+| Logs, 14 days, with redacted paths | `%LOCALAPPDATA%\Ullage\logs\` |
 | Start menu shortcut | `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Ullage.lnk` |
 
 To uninstall, run `ullage.exe --remove-shortcut`, delete the executable, and delete the
-two `Ullage` folders above.
+two `Ullage` folders above (`%APPDATA%\Ullage` and `%LOCALAPPDATA%\Ullage`).
 
 ## Building
 

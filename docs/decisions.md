@@ -422,10 +422,26 @@ One executable with the UI embedded, built with `-H windowsgui` so no console wi
 opens, version stamped with `-X main.version`. Without a console, fatal errors appear in a
 message box. `scripts/build.sh` and `scripts/build.ps1` produce `bin\ullage.exe`.
 
-### D-063: No log file — Reported (Phase 6)
-The scan log lives in memory and is shown on the Scanning screen; nothing is written to a
-log file, so safety rule 8 (no unredacted paths of redacted items in logs) holds by
-construction. The planned `%LOCALAPPDATA%\Ullage\logs` folder was never needed.
+### D-063: Log files, redacted — Revised on review (Phase 6)
+At first no log file was written. On review, logs are written with sensitive information
+redacted: `%LOCALAPPDATA%\Ullage\logs\ullage-YYYYMMDD.log`, one file per day, kept 14
+days, at most 10 MB per day. Every line is built from safe parts:
+
+- Paths go through the same redactor as prompts (`~`, `<Rn>` placeholders, account and
+  machine names hidden). Below the deepest scanned node, names are shown as `…`, because
+  the scan never recorded them and they cannot be checked against the rules.
+- Paths outside the scan, and every path while the rules cannot be read, are written as
+  `<path withheld>` (fail closed, like safety rule 7).
+- Scan events are held in memory and written when the scan finishes, since paths can be
+  rendered only once the tree exists; a failed scan logs its error with paths withheld.
+- Free text such as error messages is scrubbed: embedded paths rendered as above, account
+  names and the machine name replaced by `<account>`, SIDs by `<sid>`.
+- Never logged: rule patterns (they may name what is hidden), prompt text, reply text.
+
+A leak test scans names covered by a rule, an always-redacted word, a SID and a link to
+a folder outside the scan, runs export and paste, and asserts that none of them reaches
+the log; a second test asserts that all paths are withheld while the rules are
+unreadable. Both fail when rendering is bypassed.
 
 ### D-064: End-to-end test level — Reported (Phase 6)
 The required "end-to-end on Windows CI" test drives a real server over loopback the way

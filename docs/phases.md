@@ -11,7 +11,7 @@ for review. Status is updated as phases land.
 | 3 | Prompt builder, parser, validator, repair prompts, Export and Paste screens | Parser fixtures, injection, token estimator | Done, approved |
 | 4 | Results screen, round B explanations, low-confidence gating | Merge and sort, round B parser | Done, approved |
 | 5 | Deletion pipeline and confirmation screen | Guard refusals, change detection, partial failures | Done, approved |
-| 6 | History, all design states, packaging, Start menu shortcut, README | End-to-end on Windows CI | Done, awaiting review |
+| 6 | History, all design states, packaging, Start menu shortcut, README | End-to-end on Windows CI | Done, approved |
 
 ## Phase 0 summary
 
@@ -240,3 +240,6 @@ Tested:
   remote requests.
 
 Deviations reported: D-059 to D-064; design conflicts 21 and 22.
+
+Review outcome: approved, with one change: logs are written, with sensitive information
+redacted (D-063 revised).

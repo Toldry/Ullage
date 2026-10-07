@@ -108,5 +108,6 @@ func (manager *Manager) ClearHistory() (HistoryView, error) {
 	if err := manager.history.Clear(); err != nil {
 		return HistoryView{}, err
 	}
+	manager.Log("history", "cleared")
 	return manager.History(), nil
 }

@@ -131,6 +131,10 @@ func (manager *Manager) pasteExplanations(text string) PasteResult {
 	result := PasteResult{Explanations: &parsed, Valid: parsed.Valid(),
 		Result: response.Result{Categories: []response.Category{},
 			Problems: []response.Problem{}}}
+	manager.logf("paste", "explanations round %d: %s, %d explained, %d still queued, "+
+		"%d problems", expectation.Round, map[bool]string{true: "imported",
+		false: "rejected"}[result.Valid], len(parsed.Explanations), len(parsed.Missing),
+		len(parsed.Problems))
 	if result.Valid {
 		now := time.Now()
 		for _, explanation := range parsed.Explanations {
