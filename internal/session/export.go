@@ -182,7 +182,8 @@ func (manager *Manager) Paste(request PasteRequest) (PasteResult, error) {
 	parsed := response.Parse(request.Text, expectation)
 	result := PasteResult{Result: parsed, Valid: parsed.Valid()}
 	manager.logf("paste", "batch %d of %s: %s, %d categories, %d items, %d problems",
-		batch.Number, export.Code, map[bool]string{true: "imported", false: "rejected"}[result.Valid], len(parsed.Categories), parsed.Classified, len(parsed.Problems))
+		batch.Number, export.Code, importedWord(result.Valid), len(parsed.Categories),
+		parsed.Classified, len(parsed.Problems))
 	if result.Valid {
 		manager.importBatch(batch.Number, parsed.Categories)
 		result.Imported = true

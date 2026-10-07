@@ -182,3 +182,10 @@ func pluralWord(count int, singular, plural string) string {
 	}
 	return plural
 }
+
+func importedWord(valid bool) string {
+	if valid {
+		return "imported"
+	}
+	return "rejected"
+}
