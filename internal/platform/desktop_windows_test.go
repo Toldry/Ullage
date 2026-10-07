@@ -22,7 +22,12 @@ func TestShellLinkResolves(t *testing.T) {
 		t.Fatal(err)
 	}
 	link := filepath.Join(t.TempDir(), "Ullage.lnk")
-	if err := os.WriteFile(link, ShellLink(target, "Local disk space analyzer"), 0o644); err != nil {
+	idList, err := ItemIDList(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := ShellLink(target, "Local disk space analyzer", idList)
+	if err := os.WriteFile(link, content, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	script := "[Console]::OutputEncoding = [Text.Encoding]::UTF8; " +
@@ -35,8 +40,12 @@ func TestShellLinkResolves(t *testing.T) {
 		t.Fatalf("powershell: %v %s", err, output)
 	}
 	lines := strings.Split(strings.TrimSpace(strings.ReplaceAll(string(output), "\r", "")), "\n")
-	if len(lines) != 3 || !strings.EqualFold(lines[0], target) ||
-		!strings.EqualFold(lines[1], directory) || lines[2] != "Local disk space analyzer" {
+	// The runner's temp folder has an 8.3 short name; compare long forms.
+	same := func(first, second string) bool {
+		return strings.EqualFold(CanonicalPath(first), CanonicalPath(second))
+	}
+	if len(lines) != 3 || !same(lines[0], target) || !same(lines[1], directory) ||
+		lines[2] != "Local disk space analyzer" {
 		t.Fatalf("shortcut reads back as %q, want %q", lines, target)
 	}
 }

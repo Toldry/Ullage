@@ -105,7 +105,7 @@ func run(noBrowser bool) error {
 	}
 	environment := session.NativeEnvironment(configDirectory)
 	if dataDirectory, err := platform.DataDirectory(); err == nil {
-		environment.HistoryPath = filepath.Join(dataDirectory, "history.json")
+		environment.HistoryPath = filepath.Join(dataDirectory, "history.dpapi")
 	}
 	manager, err := session.NewManager(environment)
 	if err != nil {

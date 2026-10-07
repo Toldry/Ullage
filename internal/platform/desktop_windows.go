@@ -6,10 +6,13 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	unicode16 "unicode/utf16"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -45,7 +48,11 @@ func InstallShortcut(executable string) error {
 	if err != nil {
 		return err
 	}
-	content := ShellLink(executable, "Local disk space analyzer")
+	idList, err := ItemIDList(executable)
+	if err != nil {
+		return err
+	}
+	content := ShellLink(executable, "Local disk space analyzer", idList)
 	return os.WriteFile(path, content, 0o644)
 }
 
@@ -63,6 +70,7 @@ func RemoveShortcut() error {
 
 // Shell link constants from [MS-SHLLINK].
 const (
+	linkHasTargetIDList    = 0x00000001
 	linkHasLinkInfo        = 0x00000002
 	linkHasName            = 0x00000004
 	linkHasWorkingDir      = 0x00000010
@@ -74,10 +82,11 @@ const (
 	fileAttributeArchive   = 0x20
 )
 
-// ShellLink writes a minimal .lnk file ([MS-SHLLINK]) pointing at target: a header, a
-// LinkInfo with the local path in both ANSI and Unicode, a description and the working
-// folder. Writing the format directly avoids COM and keeps the build free of cgo.
-func ShellLink(target, description string) []byte {
+// ShellLink writes a minimal .lnk file ([MS-SHLLINK]) pointing at target: a header, the
+// shell's item ID list for the target (which is what the shell resolves), a LinkInfo
+// with the local path in ANSI and Unicode as a fallback, a description and the working
+// folder. Writing the format directly avoids COM objects and keeps the build free of cgo.
+func ShellLink(target, description string, idList []byte) []byte {
 	var out bytes.Buffer
 	write := func(values ...any) {
 		for _, value := range values {
@@ -89,10 +98,18 @@ func ShellLink(target, description string) []byte {
 	write(uint32(0x4C))
 	out.Write([]byte{0x01, 0x14, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x46})
-	write(uint32(linkHasLinkInfo|linkHasName|linkHasWorkingDir|linkIsUnicode),
+	flags := uint32(linkHasLinkInfo | linkHasName | linkHasWorkingDir | linkIsUnicode)
+	if len(idList) > 0 {
+		flags |= linkHasTargetIDList
+	}
+	write(flags,
 		uint32(fileAttributeArchive), uint64(0), uint64(0), uint64(0), uint32(0),
 		int32(0), uint32(showNormal), uint16(0), uint16(0), uint32(0), uint32(0))
 
+	if len(idList) > 0 {
+		write(uint16(len(idList)))
+		out.Write(idList)
+	}
 	out.Write(linkInfo(target))
 	writeCountedString(&out, description)
 	writeCountedString(&out, filepath.Dir(target))
@@ -158,4 +175,28 @@ func writeCountedString(out *bytes.Buffer, text string) {
 	for _, unit := range units {
 		_ = binary.Write(out, binary.LittleEndian, unit)
 	}
+}
+
+var (
+	procSHParseDisplayName = shell32.NewProc("SHParseDisplayName")
+	procILGetSize          = shell32.NewProc("ILGetSize")
+)
+
+// ItemIDList asks the shell for the item ID list of an existing file, including the
+// two-byte terminator, as stored in a shortcut.
+func ItemIDList(path string) ([]byte, error) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	if err := windows.CoInitializeEx(0, windows.COINIT_APARTMENTTHREADED); err == nil {
+		defer windows.CoUninitialize()
+	}
+	var list *byte
+	result, _, _ := procSHParseDisplayName.Call(uintptr(unsafe.Pointer(utf16(path))), 0,
+		uintptr(unsafe.Pointer(&list)), 0, 0)
+	if result != 0 || list == nil {
+		return nil, fmt.Errorf("the shell could not resolve %s (0x%X)", path, result)
+	}
+	defer windows.CoTaskMemFree(unsafe.Pointer(list))
+	size, _, _ := procILGetSize.Call(uintptr(unsafe.Pointer(list)))
+	return append([]byte{}, unsafe.Slice(list, size)...), nil
 }

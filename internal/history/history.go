@@ -1,9 +1,11 @@
 // Package history keeps a local record of past sessions: when, which drives, how much
-// space was used and reclaimed. It stores drive names and numbers only, never paths, so
-// it holds nothing that redaction would have to protect.
+// space was used and reclaimed. It stores drive names and numbers only, never paths, and
+// the file is encrypted for the current user anyway: even dates and freed sizes are
+// nobody else's business, and protecting them costs nothing.
 package history
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"os"
@@ -11,8 +13,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/toldry/ullage/internal/protect"
 	"github.com/toldry/ullage/internal/storage"
 )
+
+// fileMagic starts the decrypted content, so a blob protected for another purpose is
+// never read as history.
+var fileMagic = []byte("ULLAGE-HISTORY\x00")
 
 // maximumEntries bounds the file; the oldest sessions are dropped first.
 const maximumEntries = 500
@@ -40,20 +47,28 @@ func (entry Entry) Reclaimed() int64 { return entry.Recycled + entry.Deleted }
 
 // Store is the history file. It is safe for concurrent use.
 type Store struct {
-	path    string
-	lock    sync.Mutex
-	entries []Entry
+	path      string
+	protector protect.Protector
+	lock      sync.Mutex
+	entries   []Entry
 }
 
 // Open reads the history file. A missing file is an empty history; an unreadable one is
-// moved aside and history starts over, since losing it costs nothing but the record.
-func Open(path string) *Store {
-	store := &Store{path: path}
-	content, err := os.ReadFile(path)
+// moved aside and history starts over. Unlike the redaction rules this need not fail
+// closed: history decides nothing, and losing it costs only the record.
+func Open(path string, protector protect.Protector) *Store {
+	store := &Store{path: path, protector: protector}
+	sealed, err := os.ReadFile(path)
 	if err != nil {
 		return store
 	}
-	if err := json.Unmarshal(content, &store.entries); err != nil {
+	content, err := protector.Unprotect(sealed)
+	if err == nil && bytes.HasPrefix(content, fileMagic) {
+		err = json.Unmarshal(content[len(fileMagic):], &store.entries)
+	} else if err == nil {
+		err = errors.New("not a history file")
+	}
+	if err != nil {
 		store.entries = nil
 		_ = os.Rename(path, path+".unreadable")
 	}
@@ -107,9 +122,14 @@ func (store *Store) Clear() error {
 }
 
 func (store *Store) save() error {
-	content, err := json.MarshalIndent(store.entries, "", "  ")
+	content, err := json.Marshal(store.entries)
 	if err != nil {
 		return err
 	}
-	return storage.WriteFileAtomically(store.path, content)
+	sealed, err := store.protector.Protect(append(append([]byte{}, fileMagic...),
+		content...))
+	if err != nil {
+		return err
+	}
+	return storage.WriteFileAtomically(store.path, sealed)
 }

@@ -55,7 +55,7 @@ type Environment struct {
 	Remover        deletion.Remover
 	Canonical      func(string) string
 	ProtectedTrees []string
-	// HistoryPath is the session history file; empty means history.json in the config
+	// HistoryPath is the session history file; empty means history.dpapi in the config
 	// directory.
 	HistoryPath string
 }
@@ -161,9 +161,9 @@ func NewManager(environment Environment) (*Manager, error) {
 		log: newEventLog(400)}
 	historyPath := environment.HistoryPath
 	if historyPath == "" {
-		historyPath = filepath.Join(environment.ConfigDirectory, "history.json")
+		historyPath = filepath.Join(environment.ConfigDirectory, "history.dpapi")
 	}
-	manager.history = history.Open(historyPath)
+	manager.history = history.Open(historyPath, environment.Protector)
 	manager.loadRules()
 	return manager, nil
 }

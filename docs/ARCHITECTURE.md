@@ -184,9 +184,10 @@ flowchart LR
 
 Step by step:
 
-1. **Launch.** `ullage.exe` acquires a named mutex. If an instance is already running, it asks
-   that instance over a named pipe (current-user ACL) to mint a new launch token and open a
-   browser tab, then exits.
+1. **Launch.** `ullage.exe` creates a per-user named pipe with
+   `FILE_FLAG_FIRST_PIPE_INSTANCE`, which doubles as the single-instance lock. If it
+   exists, another copy runs: the new process asks it over the pipe (ACL: current user
+   only; remote clients rejected) for a fresh launch link, opens that, and exits.
 2. **Scan.** The user picks roots (drives or folders). The scanner streams progress to the UI
    over Server-Sent Events. Each entry gets a stable `ItemID` within the session.
 3. **Classify.** Recipe patterns claim Known items first; System rules claim the rest of
@@ -294,8 +295,8 @@ All under the current user's profile. Nothing is written next to the executable.
 |--------------------------|--------------------------------------------------|---------------------|
 | Config (theme, batch budget, last roots) | `%APPDATA%\Ullage\config.json`   | Plain (no paths of redacted items) |
 | Redaction rules + placeholder map | `%APPDATA%\Ullage\rules.dpapi`          | DPAPI, current user |
-| History (dates, bytes reclaimed, counts) | `%APPDATA%\Ullage\history.dpapi` | DPAPI, current user |
-| Logs                     | `%LOCALAPPDATA%\Ullage\logs\ullage-YYYYMMDD.log` | Paths always rendered redacted |
+| History (dates, drives, bytes, counts; no paths) | `%LOCALAPPDATA%\Ullage\history.dpapi` | DPAPI, current user |
+| Start menu shortcut      | `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Ullage.lnk` | - |
 | Scan data                | In memory only; discarded when the process exits | -                   |
 
 - Writes are atomic: write to `*.tmp`, `FlushFileBuffers`, `MoveFileExW(REPLACE_EXISTING)`.
