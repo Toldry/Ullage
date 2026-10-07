@@ -129,8 +129,10 @@ func TestFixtureAccessDeniedFolder(t *testing.T) {
 	root := t.TempDir()
 	locked := filepath.Join(root, "locked")
 	writeFile(t, filepath.Join(locked, "inside.bin"), 1<<20)
-	// Deny listing to Everyone. Without SeBackupPrivilege enabled (the test never enables
-	// it) the deny entry applies even to administrators.
+	// Deny listing to Everyone. Without SeBackupPrivilege enabled the deny entry applies
+	// even to administrators. The test disables it explicitly: a parent such as Git Bash
+	// (the Cygwin runtime) enables it for elevated users, and children inherit that.
+	withoutBackupPrivilege(t)
 	const everyone = "*S-1-1-0"
 	if output, err := exec.Command("icacls", locked, "/deny",
 		everyone+":(RD)").CombinedOutput(); err != nil {
@@ -142,4 +144,36 @@ func TestFixtureAccessDeniedFolder(t *testing.T) {
 	if result.DeniedCount != 1 || findNode(t, result, locked).Flags&FlagAccessDenied == 0 {
 		t.Fatalf("denied = %d paths %v", result.DeniedCount, result.DeniedPaths)
 	}
+}
+
+// withoutBackupPrivilege disables SeBackupPrivilege for the test and restores the
+// previous state afterwards.
+func withoutBackupPrivilege(t *testing.T) {
+	t.Helper()
+	var token windows.Token
+	if err := windows.OpenProcessToken(windows.CurrentProcess(),
+		windows.TOKEN_ADJUST_PRIVILEGES|windows.TOKEN_QUERY, &token); err != nil {
+		t.Fatal(err)
+	}
+	var luid windows.LUID
+	name, _ := windows.UTF16PtrFromString("SeBackupPrivilege")
+	if err := windows.LookupPrivilegeValue(nil, name, &luid); err != nil {
+		token.Close()
+		t.Fatal(err)
+	}
+	disabled := windows.Tokenprivileges{PrivilegeCount: 1}
+	disabled.Privileges[0] = windows.LUIDAndAttributes{Luid: luid}
+	var previous windows.Tokenprivileges
+	var length uint32
+	if err := windows.AdjustTokenPrivileges(token, false, &disabled,
+		uint32(unsafe.Sizeof(previous)), &previous, &length); err != nil {
+		token.Close()
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if previous.PrivilegeCount > 0 {
+			_ = windows.AdjustTokenPrivileges(token, false, &previous, 0, nil, nil)
+		}
+		token.Close()
+	})
 }
