@@ -2677,3 +2677,15 @@ h1 {
 .current-pill {
   margin-right: 8px;
 }
+
+.history-outcome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-outcome .pill {
+  flex: none;
+  width: auto;
+  margin-right: 0;
+}

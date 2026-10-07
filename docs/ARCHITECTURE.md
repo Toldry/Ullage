@@ -129,15 +129,18 @@ ullage/
 │   ├── response/            tolerant reply extraction, strict validation, repair prompts
 │   ├── results/             recipe + AI categories merged, names restored for display
 │   ├── deletion/            guard, re-verification, Recycle Bin / permanent delete
+│   ├── history/             encrypted, path-free record of past sessions
+│   ├── instance/            single instance through a per-user named pipe
+│   ├── e2e/                 API end-to-end test over loopback (test only)
 │   ├── session/             per-launch state: scan, code, log, redaction, export, results
 │   ├── server/              HTTP handlers, token/Host/Origin guard, SSE progress
 │   ├── storage/             config file, atomic writes
 │   └── nonetwork/           runtime guard that disables outbound HTTP and DNS
 │   ├── scanner/scannertest/ in-memory file system for tests
-│   (Phase 6 adds history/)
 ├── web/                     Preact + TypeScript UI; dist/ is embedded by package web
 ├── tools/nonetwork/         build check: forbids outbound network APIs (see §6)
 ├── tools/tokenestimate/     DEV ONLY: token estimate for prompts of a sample scan
+├── scripts/                 build.sh and build.ps1 for the release executable
 ├── docs/                    this file, requirements, decisions, phase plan
 └── .github/workflows/       CI on Windows and Linux
 ```

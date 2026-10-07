@@ -389,3 +389,47 @@ Selection keys name a category and an item of the current Results (`ai:3|id:42`,
 `recipe:npm-cache|node:17`, or `ai:3/rest` for items beyond the 200 listed). The server
 resolves them itself; a key that names nothing deletable is listed as refused with the
 reason, never silently dropped, and never interpreted as a path.
+
+## History, launch and packaging (Phase 6)
+
+### D-059: What history keeps — Reported (Phase 6)
+One entry per scan: start and end time, drive names (`C:`; a folder scan records only
+its drive), used space before and after deleting, batches imported, items deleted,
+bytes sent to the Recycle Bin, bytes deleted permanently, and failures. No file or folder
+names. The file is encrypted for the current user like the rules (DPAPI on Windows) and
+lives in `%LOCALAPPDATA%\Ullage\history.dpapi`. An unreadable file is moved aside and
+history starts over: unlike the rules, history decides nothing, so it need not fail
+closed. "Clear history" asks twice. The design's "Still restorable in the Recycle Bin"
+became "Sent to the Recycle Bin": Ullage cannot tell whether the bin was emptied since.
+
+### D-060: Single instance through a named pipe — Reported (Phase 6)
+The first copy creates `\\.\pipe\Ullage-<user SID>` with `FILE_FLAG_FIRST_PIPE_INSTANCE`,
+which is the lock; the pipe's ACL allows only the current user and remote clients are
+rejected. A second launch writes `launch` and receives a fresh one-time launch link,
+checks that it points to `http://127.0.0.1:`, opens it and exits. No TCP is involved, so
+the no-network check needed no exception. Linux has no single-instance handling yet.
+
+### D-061: Start menu shortcut — Reported (Phase 6)
+Created on the first run (not when running from the temp folder, as `go run` does), and
+managed with `--install-shortcut` and `--remove-shortcut`. The `.lnk` is written directly
+in the documented format, with the item ID list obtained from the shell
+(`SHParseDisplayName`), so there are no COM objects and no cgo. Windows CI reads it back
+through `WScript.Shell`, including a non-ASCII folder name. Moving the executable breaks
+the shortcut; running `--install-shortcut` from the new place fixes it.
+
+### D-062: Release build — Reported (Phase 6)
+One executable with the UI embedded, built with `-H windowsgui` so no console window
+opens, version stamped with `-X main.version`. Without a console, fatal errors appear in a
+message box. `scripts/build.sh` and `scripts/build.ps1` produce `bin\ullage.exe`.
+
+### D-063: No log file — Reported (Phase 6)
+The scan log lives in memory and is shown on the Scanning screen; nothing is written to a
+log file, so safety rule 8 (no unredacted paths of redacted items in logs) holds by
+construction. The planned `%LOCALAPPDATA%\Ullage\logs` folder was never needed.
+
+### D-064: End-to-end test level — Reported (Phase 6)
+The required "end-to-end on Windows CI" test drives a real server over loopback the way
+the browser does (launch link, cookie, token header, Origin): scan a temporary folder,
+export, import replies for both rounds, verify, recycle with the real Recycle Bin, and
+read the history. Browser-level runs (headless Chromium) are done during development;
+they are not part of CI, to keep it free of browser downloads.

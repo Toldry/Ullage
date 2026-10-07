@@ -11,7 +11,7 @@ for review. Status is updated as phases land.
 | 3 | Prompt builder, parser, validator, repair prompts, Export and Paste screens | Parser fixtures, injection, token estimator | Done, approved |
 | 4 | Results screen, round B explanations, low-confidence gating | Merge and sort, round B parser | Done, approved |
 | 5 | Deletion pipeline and confirmation screen | Guard refusals, change detection, partial failures | Done, approved |
-| 6 | History, all design states, packaging, Start menu shortcut, README | End-to-end on Windows CI | Planned |
+| 6 | History, all design states, packaging, Start menu shortcut, README | End-to-end on Windows CI | Done, awaiting review |
 
 ## Phase 0 summary
 
@@ -207,3 +207,36 @@ Deviations reported: D-051 to D-057; design conflicts 19 and 20.
 
 Review outcome: approved. Cloud-synced and cloud-only items became deletable with clear
 warnings instead of being refused (D-052).
+
+## Phase 6 summary
+
+Built:
+
+- `history`: encrypted, path-free session history; History screen (key H) with totals,
+  per-session rows and clear (D-059).
+- `instance`: single instance through a per-user named pipe; a second launch opens a new
+  tab of the running session (D-060).
+- Start menu shortcut on first run and on request, written without COM or cgo (D-061).
+- Release build: one GUI-subsystem executable, version stamped, message box for fatal
+  errors, build scripts for bash and PowerShell (D-062). README rewritten for users.
+- Design states audited (first run, scanning, partial scan, the three paste states,
+  nothing found, deletion progress and partial failure, invalid link) and keys 1-7, R,
+  H, T wired.
+- Fixed along the way: a run was reported finished before its results were recorded;
+  Linux reported a scanned folder as its drive name (history would have held a path);
+  a file inside a cloud-sync folder was not flagged as cloud-synced.
+
+Tested:
+
+- History: persistence, ordering, clear, unreadable file, encryption, no paths (also
+  for folder scans at the session level).
+- Single instance (Windows CI): second claim refused, launch requests answered, no
+  instance found; launch-link validation.
+- Shortcut (Windows CI): Windows' own shell reads target, working folder and description
+  back, with a non-ASCII folder name.
+- API end-to-end over loopback on Windows and Linux CI: token required, scan, export,
+  both rounds, verify, recycle, file kept that the AI said to keep, history (D-064).
+- Headless Chromium: the full flow ending on the History screen; no console errors or
+  remote requests.
+
+Deviations reported: D-059 to D-064; design conflicts 21 and 22.

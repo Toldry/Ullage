@@ -26,3 +26,5 @@ Each conflict below was reported when found.
 | 18 | WSL distro images listed as "recipes say keep" | The WSL recipe has managed cleanup steps | Listed as "Managed cleanup only", like Docker | Phase 4 |
 | 19 | Confirmation shows Ready / Blocked · changed / Missing | Items can also be refused or protected (D-052, D-058) | "Blocked · changed or refused" counts both; each row says why | Phase 5 |
 | 20 | Rows show IFileOperation-style per-file progress | Shell API with per-item outcomes checked on disk | One shell call per item; outcome verified afterwards (D-054) | Phase 5 |
+| 21 | History stored in `%LOCALAPPDATA%\Ullage\history.db` | Architecture: history encrypted, no paths | `history.dpapi` (DPAPI), drive names and numbers only (D-059) | Phase 6 |
+| 22 | "Still restorable in the Recycle Bin" | Ullage cannot see whether the bin was emptied | "Sent to the Recycle Bin … until the bin is emptied" (D-059) | Phase 6 |

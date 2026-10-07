@@ -80,7 +80,7 @@ export function HistoryScreen({ guard }: Props) {
                   {entry.recycled ? formatBytes(entry.recycled) : '–'}
                 </span>
                 <span class="cell-mono align-right">{entry.batches || '–'}</span>
-                <span class="small">
+                <span class="small history-outcome">
                   {entry.code === view.current && <span class="pill current-pill">current</span>}
                   {outcome(entry, entry.code === view.current)}
                 </span>
