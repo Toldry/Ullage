@@ -203,6 +203,7 @@ func (manager *Manager) importBatch(batch int, categories []response.Category) {
 	}
 	state.imports[batch] = BatchImport{Categories: categories, Numbers: numbers,
 		ImportedAt: time.Now()}
+	manager.recordImports()
 }
 
 // Imports returns the validated categories per batch.

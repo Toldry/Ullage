@@ -10,6 +10,7 @@ import { ExportScreen } from './screens/ExportScreen';
 import { PasteScreen } from './screens/PasteScreen';
 import { ResultsScreen } from './screens/ResultsScreen';
 import { DeleteDialog } from './screens/DeleteDialog';
+import { HistoryScreen } from './screens/HistoryScreen';
 import { pruneSelection } from './lib/results';
 import { RedactScreen } from './screens/RedactScreen';
 import { RulesScreen } from './screens/RulesScreen';
@@ -151,7 +152,7 @@ export function App() {
     const needsScan: Screen[] = ['overview', 'redact', 'export', 'paste', 'results', 'delete'];
     if (needsScan.includes(target) && !overview) return;
     if (target === 'delete' && deletionSelection.size === 0) return;
-    if ([...needsScan, 'scan', 'rules'].includes(target)) setScreen(target);
+    if ([...needsScan, 'scan', 'rules', 'history'].includes(target)) setScreen(target);
   }, [screen, overview, deletionSelection]);
 
   const startFromKeyboard = useCallback(() => {
@@ -172,6 +173,8 @@ export function App() {
     else if (event.key === '4') navigate('export');
     else if (event.key === '5') navigate('paste');
     else if (event.key === '6') navigate('results');
+    else if (event.key === '7') navigate('delete');
+    else if (event.key === 'h' || event.key === 'H') navigate('history');
     else if (event.key === 'r' || event.key === 'R') navigate('rules');
     else if (event.key === 't' || event.key === 'T') toggleTheme();
     else if (event.key === 'Enter' && screen === 'scan' && target.tagName !== 'BUTTON') {
@@ -283,6 +286,7 @@ export function App() {
               onContinue={() => setScreen('export')} />
           )}
           {screen === 'rules' && <RulesScreen guard={guard} />}
+          {screen === 'history' && <HistoryScreen guard={guard} />}
           {screen === 'export' && (
             <ExportScreen guard={guard} batch={batch} onBatchChange={setBatch}
               onGoPaste={() => setScreen('paste')} onExportLoaded={onExportLoaded} />

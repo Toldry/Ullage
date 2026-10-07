@@ -2,12 +2,16 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/toldry/ullage/internal/instance"
 	"github.com/toldry/ullage/internal/nonetwork"
 	"github.com/toldry/ullage/internal/platform"
 	"github.com/toldry/ullage/internal/server"
@@ -22,18 +26,75 @@ var version = "0.1.0-dev"
 // runs. Open tabs send a heartbeat every minute, even when in the background.
 const idleShutdown = 15 * time.Minute
 
+// instanceName names the single-instance channel; the platform adds the user's identity.
+const instanceName = "Ullage"
+
 func main() {
 	nonetwork.Install()
 	noBrowser := flag.Bool("no-browser", false, "print the launch link instead of opening it")
+	installShortcut := flag.Bool("install-shortcut", false,
+		"create the Start menu shortcut and exit")
+	removeShortcut := flag.Bool("remove-shortcut", false,
+		"remove the Start menu shortcut and exit")
 	flag.Parse()
 
-	if err := run(*noBrowser); err != nil {
-		fmt.Fprintln(os.Stderr, "ullage:", err)
+	var err error
+	switch {
+	case *installShortcut:
+		err = installStartMenuShortcut()
+	case *removeShortcut:
+		err = platform.RemoveShortcut()
+	default:
+		err = run(*noBrowser)
+	}
+	if err != nil {
+		// The release build has no console, so errors go to a message box on Windows.
+		platform.ShowError(err.Error())
 		os.Exit(1)
 	}
 }
 
+func installStartMenuShortcut() error {
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	return platform.InstallShortcut(executable)
+}
+
+// isTemporaryBuild reports whether the executable runs from the temp folder, as with
+// "go run"; a shortcut to it would break as soon as the build is cleaned up.
+func isTemporaryBuild() bool {
+	executable, err := os.Executable()
+	if err != nil {
+		return true
+	}
+	temporary := filepath.Clean(os.TempDir()) + string(filepath.Separator)
+	return strings.HasPrefix(strings.ToLower(executable), strings.ToLower(temporary))
+}
+
+func open(launchURL string, noBrowser bool) {
+	if noBrowser {
+		fmt.Println(launchURL)
+	} else if err := platform.OpenBrowser(launchURL); err != nil {
+		platform.ShowError("Open this link in your browser: " + launchURL)
+	}
+}
+
 func run(noBrowser bool) error {
+	channel, err := instance.Claim(instanceName)
+	if errors.Is(err, instance.ErrAlreadyRunning) {
+		launchURL, requestErr := instance.RequestLaunch(instanceName)
+		if requestErr != nil {
+			return fmt.Errorf("Ullage is already running but did not answer: %w", requestErr)
+		}
+		open(launchURL, noBrowser)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
 	configDirectory, err := platform.ConfigDirectory()
 	if err != nil {
 		return err
@@ -42,9 +103,17 @@ func run(noBrowser bool) error {
 		// Lets an elevated scan read folders like System Volume Information. Read-only.
 		platform.EnableBackupPrivilege()
 	}
-	manager, err := session.NewManager(session.NativeEnvironment(configDirectory))
+	environment := session.NativeEnvironment(configDirectory)
+	if dataDirectory, err := platform.DataDirectory(); err == nil {
+		environment.HistoryPath = filepath.Join(dataDirectory, "history.json")
+	}
+	manager, err := session.NewManager(environment)
 	if err != nil {
 		return err
+	}
+	if manager.FirstRun() && platform.Name == "windows" && !isTemporaryBuild() {
+		// Best effort: the app works the same without a Start menu entry.
+		_ = installStartMenuShortcut()
 	}
 
 	quit := make(chan struct{}, 1)
@@ -64,17 +133,13 @@ func run(noBrowser bool) error {
 	}
 	go func() {
 		if err := localServer.Serve(); err != nil {
-			fmt.Fprintln(os.Stderr, "ullage: server stopped:", err)
+			platform.ShowError("The local server stopped: " + err.Error())
 			requestQuit()
 		}
 	}()
+	go channel.Serve(localServer.NewLaunchURL)
 
-	launchURL := localServer.NewLaunchURL()
-	if noBrowser {
-		fmt.Println(launchURL)
-	} else if err := platform.OpenBrowser(launchURL); err != nil {
-		fmt.Println("Open this link in your browser:", launchURL)
-	}
+	open(localServer.NewLaunchURL(), noBrowser)
 
 	interrupts := make(chan os.Signal, 1)
 	signal.Notify(interrupts, os.Interrupt)
@@ -88,7 +153,8 @@ func run(noBrowser bool) error {
 			return localServer.Close()
 		case <-idleCheck.C:
 			if localServer.IdleFor() > idleShutdown &&
-				manager.Progress().State != session.StateRunning {
+				manager.Progress().State != session.StateRunning &&
+				!manager.DeletionRunning() {
 				return localServer.Close()
 			}
 		}

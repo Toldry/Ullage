@@ -129,6 +129,18 @@ func TestPermanentDeletionNeedsTypedConfirmation(t *testing.T) {
 	if findCategory(view, "ai:1") != nil || findCategory(view, "ai:3") != nil {
 		t.Fatalf("deleted categories still listed: %+v", view.Categories)
 	}
+	recorded := manager.History()
+	if len(recorded.Entries) != 1 || recorded.Entries[0].Items != 2 ||
+		recorded.Entries[0].Deleted == 0 || recorded.Entries[0].Batches != 1 ||
+		recorded.Current != recorded.Entries[0].Code || recorded.Reclaimed == 0 {
+		t.Fatalf("history = %+v", recorded)
+	}
+	// A folder scan records its drive, never the folder's path.
+	for _, drive := range recorded.Entries[0].Drives {
+		if strings.Contains(drive, filepath.Base(root)) {
+			t.Fatalf("history names the scanned folder: %v", recorded.Entries[0].Drives)
+		}
+	}
 }
 
 // Safety rule 6 at the session level: a change after the plan blocks the item at

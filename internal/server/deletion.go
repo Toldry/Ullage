@@ -54,3 +54,23 @@ func (server *Server) handleDeletionProgress(writer http.ResponseWriter, _ *http
 func (server *Server) handleStopDeletion(writer http.ResponseWriter, _ *http.Request) {
 	writeJSON(writer, http.StatusOK, server.manager.StopDeletion())
 }
+
+func (server *Server) handleHistory(writer http.ResponseWriter, _ *http.Request) {
+	writeJSON(writer, http.StatusOK, server.manager.History())
+}
+
+func (server *Server) handleClearHistory(writer http.ResponseWriter, request *http.Request) {
+	var clear struct {
+		Confirm bool `json:"confirm"`
+	}
+	if err := decodeJSON(request, &clear); err != nil || !clear.Confirm {
+		writeJSONError(writer, http.StatusBadRequest, "clearing history needs confirm: true")
+		return
+	}
+	view, err := server.manager.ClearHistory()
+	if err != nil {
+		writeJSONError(writer, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(writer, http.StatusOK, view)
+}

@@ -104,8 +104,7 @@ export function Sidebar(props: {
         { screen: 'rules' as Screen, key: 'R', label: 'Redaction rules' },
         { screen: 'history' as Screen, key: 'H', label: 'History' },
       ].map((item) => {
-        // History arrives in Phase 6; until then only the rules library is available.
-        const available = item.screen === 'rules';
+        const available = true;
         return (
           <button
             type="button"
@@ -113,7 +112,6 @@ export function Sidebar(props: {
             class={`nav-item${available ? ' reached' : ''}` +
               `${props.active === item.screen ? ' active' : ''}`}
             disabled={!available}
-            title={available ? undefined : 'Arrives in a later phase'}
             onClick={() => props.onNavigate(item.screen)}
           >
             <span class="nav-number">{item.key}</span>
@@ -149,7 +147,7 @@ export function StatusBar(props: {
       {props.files !== undefined && <span>{formatCount(props.files)} files indexed</span>}
       <span>{props.elevated ? 'elevated' : 'not elevated'}</span>
       <div class="spacer" />
-      <span>1–6 steps · R rules · Enter start · Esc cancel · T theme</span>
+      <span>1–7 steps · R rules · H history · Esc cancel · T theme</span>
     </footer>
   );
 }

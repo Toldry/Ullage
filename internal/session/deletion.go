@@ -29,6 +29,9 @@ type deletionState struct {
 	runItems []DeletionItem
 	// deleted holds results.DeletedKey values; reset by a new scan.
 	deleted map[string]bool
+	// recorded: the finished run's outcomes are reflected in deleted and the history.
+	// The run is reported finished only then, so a refresh never shows stale results.
+	recorded bool
 }
 
 type deletionPlan struct {
@@ -331,6 +334,7 @@ func (manager *Manager) ExecuteDeletion(request ExecuteRequest) (DeletionRun, er
 	// The plan is used up: a second execute must go through a new confirmation.
 	manager.deletion.plan = nil
 	manager.deletion.runItems = runItems
+	manager.deletion.recorded = false
 	manager.deletion.run = deletion.Start(manager.guard(), manager.environment.Remover,
 		ordered, request.Permanent, manager.recordDeleted)
 	return manager.runView(), nil
@@ -355,6 +359,9 @@ func (manager *Manager) recordDeleted(run *deletion.Run) {
 	if manager.deletion.deleted == nil {
 		manager.deletion.deleted = map[string]bool{}
 	}
+	manager.deletion.recorded = true
+	manager.recordDeletion(manager.runView())
+	manager.deletion.recorded = false
 	state := run.State()
 	for index, outcome := range state.Outcomes {
 		if outcome.Status == deletion.StatusRecycled || outcome.Status == deletion.StatusDeleted {
@@ -363,6 +370,7 @@ func (manager *Manager) recordDeleted(run *deletion.Run) {
 				target.Kind == deletion.KindLoose)] = true
 		}
 	}
+	manager.deletion.recorded = true
 }
 
 // DeletionRun is the progress and final report.
@@ -387,7 +395,7 @@ func (manager *Manager) runView() DeletionRun {
 	}
 	state := run.State()
 	view := DeletionRun{Permanent: state.Permanent, Total: state.Total, Done: state.Done,
-		Stopping: state.Stopping, Finished: state.Finished}
+		Stopping: state.Stopping, Finished: state.Finished && manager.deletion.recorded}
 	for index, item := range manager.deletion.runItems {
 		if index >= len(state.Outcomes) {
 			item.Status, item.Reason = deletion.StatusReady, ""
@@ -425,4 +433,11 @@ func (manager *Manager) StopDeletion() DeletionRun {
 		manager.deletion.run.Stop()
 	}
 	return manager.runView()
+}
+
+// DeletionRunning reports whether a deletion is in progress, which keeps the app alive.
+func (manager *Manager) DeletionRunning() bool {
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
+	return manager.deletion.running()
 }

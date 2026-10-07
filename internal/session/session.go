@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/toldry/ullage/internal/deletion"
+	"github.com/toldry/ullage/internal/history"
 	"github.com/toldry/ullage/internal/overview"
 	"github.com/toldry/ullage/internal/platform"
 	"github.com/toldry/ullage/internal/protect"
@@ -54,6 +55,9 @@ type Environment struct {
 	Remover        deletion.Remover
 	Canonical      func(string) string
 	ProtectedTrees []string
+	// HistoryPath is the session history file; empty means history.json in the config
+	// directory.
+	HistoryPath string
 }
 
 // NativeEnvironment wires the real platform implementation.
@@ -139,6 +143,7 @@ type Manager struct {
 	redaction   redactionState
 	exportState exportState
 	deletion    deletionState
+	history     *history.Store
 }
 
 // NewManager loads the recipe library and saved config.
@@ -154,6 +159,11 @@ func NewManager(environment Environment) (*Manager, error) {
 	manager := &Manager{environment: environment, library: library, config: config,
 		firstRun: !storage.ConfigExists(environment.ConfigDirectory), state: StateIdle,
 		log: newEventLog(400)}
+	historyPath := environment.HistoryPath
+	if historyPath == "" {
+		historyPath = filepath.Join(environment.ConfigDirectory, "history.json")
+	}
+	manager.history = history.Open(historyPath)
 	manager.loadRules()
 	return manager, nil
 }
@@ -366,6 +376,7 @@ func (manager *Manager) awaitScan(current *running, restorePriority func()) {
 		manager.state = StateFinished
 		manager.resetRedactionForNewScan()
 		manager.deletion = deletionState{}
+		manager.recordScan()
 	}
 }
 

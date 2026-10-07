@@ -398,3 +398,27 @@ export interface DeletionRun {
   skipped: Tally;
   pending: Tally;
 }
+
+// History (internal/history, internal/session/history.go)
+export interface HistoryEntry {
+  code: string;
+  started: string;
+  finished: string;
+  drives: string[];
+  usedBefore: number;
+  usedAfter: number;
+  batches: number;
+  items: number;
+  recycled: number;
+  deleted: number;
+  failed: number;
+  reclaimed: number;
+}
+
+export interface HistoryView {
+  entries: HistoryEntry[];
+  current: string;
+  since?: string;
+  reclaimed: number;
+  recycled: number;
+}

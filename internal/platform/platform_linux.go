@@ -152,15 +152,23 @@ func readMounts() []mountEntry {
 	return mounts
 }
 
-func fileSystemOf(path string) string {
-	best := ""
-	fileSystem := ""
+// mountOf returns the mount that contains path: the longest mount point that is path
+// itself or one of its parent folders.
+func mountOf(path string) mountEntry {
+	best := mountEntry{mountPoint: "/"}
 	for _, mount := range readMounts() {
-		if strings.HasPrefix(path, mount.mountPoint) && len(mount.mountPoint) >= len(best) {
-			best, fileSystem = mount.mountPoint, mount.fileSystem
+		point := mount.mountPoint
+		inside := path == point || point == "/" ||
+			strings.HasPrefix(path, strings.TrimSuffix(point, "/")+"/")
+		if inside && len(point) >= len(best.mountPoint) {
+			best = mount
 		}
 	}
-	return fileSystem
+	return best
+}
+
+func fileSystemOf(path string) string {
+	return mountOf(path).fileSystem
 }
 
 // ListVolumes lists mounted local file systems.
@@ -194,10 +202,11 @@ func VolumeFor(path string) (Volume, error) {
 		return Volume{}, err
 	}
 	blockSize := int64(stat.Bsize)
+	mount := mountOf(filepath.Clean(path))
 	return Volume{
-		RootPath:    path,
-		DisplayName: path,
-		FileSystem:  fileSystemOf(path),
+		RootPath:    mount.mountPoint,
+		DisplayName: mount.mountPoint,
+		FileSystem:  mount.fileSystem,
 		TotalBytes:  int64(stat.Blocks) * blockSize,
 		FreeBytes:   int64(stat.Bavail) * blockSize,
 	}, nil
