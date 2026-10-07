@@ -186,6 +186,7 @@ func (manager *Manager) resultsView() (ResultsView, error) {
 		Explanations: state.explanations.received,
 		Queued:       map[int]bool{},
 		Expanded:     state.explanations.expanded,
+		Deleted:      manager.deletion.deleted,
 		MinimumBytes: manager.promptOptions().MinimumItemBytes,
 		Profile:      manager.CurrentProfile(),
 	}

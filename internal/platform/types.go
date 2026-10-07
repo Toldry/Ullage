@@ -32,6 +32,10 @@ const (
 	AttributeOffline
 	AttributeHidden
 	AttributeSystem
+	// AttributeManagedReparsePoint marks an entry another program manages through a
+	// reparse point that is not a plain link, such as a cloud-sync folder. Deleting it
+	// may delete data elsewhere, so the deletion guard refuses it.
+	AttributeManagedReparsePoint
 )
 
 // NotStoredLocally reports whether the entry is a cloud placeholder or offline file.
@@ -147,3 +151,12 @@ func (accessError *AccessDeniedError) Unwrap() []error {
 func IsAccessDenied(err error) bool {
 	return errors.Is(err, ErrAccessDenied)
 }
+
+// Errors of MoveToRecycleBin and deletion in general.
+var (
+	ErrInUse           = errors.New("in use by another program")
+	ErrRecycleDeclined = errors.New(
+		"the item could not be recycled, and permanent deletion was declined")
+	ErrPathTooLongForRecycleBin = errors.New("the path is too long for the Recycle Bin")
+	ErrNoRecycleBin             = errors.New("this drive has no Recycle Bin Ullage can use")
+)

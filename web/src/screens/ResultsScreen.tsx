@@ -16,6 +16,11 @@ interface Props {
   onResultsLoaded: (categories: ResultCategory[]) => void;
   onGoExport: (round: number) => void;
   onRescan: () => void;
+  onReviewDeletion: () => void;
+  // Changes after a deletion, so the list is loaded again.
+  refreshToken: number;
+  // True while the deletion dialog is open over this screen; it owns the keyboard then.
+  inactive: boolean;
 }
 
 type SourceFilter = 'all' | 'recipe' | 'ai';
@@ -23,7 +28,7 @@ type ConfidenceFilter = 'any' | 'recipe' | 'high' | 'med' | 'low';
 type RegenerableFilter = 'any' | 'yes' | 'partially' | 'no';
 
 export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLoaded,
-  onGoExport, onRescan }: Props) {
+  onGoExport, onRescan, onReviewDeletion, refreshToken, inactive }: Props) {
   const [view, setView] = useState<ResultsView | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [focused, setFocused] = useState(0);
@@ -40,7 +45,7 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
 
   useEffect(() => {
     void guard(resultsApi.get()).then(accept);
-  }, [guard, accept]);
+  }, [guard, accept, refreshToken]);
 
   const rows = (view?.categories ?? []).filter((category) =>
     (source === 'all' || category.source === source) &&
@@ -74,14 +79,16 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+      if (inactive || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
       if (event.ctrlKey || event.metaKey || event.altKey || allRows.length === 0) return;
       const current = allRows[Math.min(focused, allRows.length - 1)];
       if (event.key === 'j') setFocused(Math.min(focused + 1, allRows.length - 1));
       else if (event.key === 'k') setFocused(Math.max(focused - 1, 0));
       else if (event.key === 'Enter' && target.tagName !== 'BUTTON') void toggleExpand(current);
       else if (event.key === 'x') toggleSelected(current);
-      else return;
+      else if ((event.key === 'd' || event.key === 'D') && selection.size > 0) {
+        onReviewDeletion();
+      } else return;
       event.preventDefault();
     };
     window.addEventListener('keydown', onKey);
@@ -173,8 +180,9 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
             {totals.items ? `${pluralize(totals.items, 'item')} · ${formatBytes(totals.bytes)} ` +
               'selected' : 'nothing selected'}
           </span>
-          <button type="button" class="button button-primary button-with-key" disabled
-            title="Deletion arrives with step 7.">
+          <button type="button" class="button button-primary button-with-key"
+            disabled={totals.items === 0} onClick={onReviewDeletion}
+            title={totals.items === 0 ? 'Select items to delete first' : undefined}>
             Review deletion
             <Kbd inverse>D</Kbd>
           </button>

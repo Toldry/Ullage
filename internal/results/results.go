@@ -76,6 +76,12 @@ type Item struct {
 	Bytes      int64  `json:"bytes"`
 	Files      int64  `json:"files"`
 	Modified   int64  `json:"modified"`
+
+	// What deletion resolves the item to; never sent to the browser.
+	Node    scanner.NodeIndex   `json:"-"`
+	Listed  []scanner.NodeIndex `json:"-"`
+	Tier    scanner.Tier        `json:"-"`
+	ClaimID int32               `json:"-"`
 }
 
 // Category is one row of the Results screen.
@@ -84,19 +90,21 @@ type Category struct {
 	Number int    `json:"number,omitempty"`
 	Name   string `json:"name"`
 	// RestoredFrom is the assistant's name when real names were put back into it.
-	RestoredFrom     string           `json:"restoredFrom,omitempty"`
-	Source           Source           `json:"source"`
-	RecipeID         string           `json:"recipeId,omitempty"`
-	RecipeVersion    int              `json:"recipeVersion,omitempty"`
-	Batch            int              `json:"batch,omitempty"`
-	ImportedAt       time.Time        `json:"importedAt,omitempty"`
-	Confidence       string           `json:"confidence"`
-	Regenerable      string           `json:"regenerable"`
-	Bytes            int64            `json:"bytes"`
-	Files            int64            `json:"files"`
-	ItemCount        int              `json:"itemCount"`
-	Root             string           `json:"root"`
-	Items            []Item           `json:"items"`
+	RestoredFrom  string    `json:"restoredFrom,omitempty"`
+	Source        Source    `json:"source"`
+	RecipeID      string    `json:"recipeId,omitempty"`
+	RecipeVersion int       `json:"recipeVersion,omitempty"`
+	Batch         int       `json:"batch,omitempty"`
+	ImportedAt    time.Time `json:"importedAt,omitempty"`
+	Confidence    string    `json:"confidence"`
+	Regenerable   string    `json:"regenerable"`
+	Bytes         int64     `json:"bytes"`
+	Files         int64     `json:"files"`
+	ItemCount     int       `json:"itemCount"`
+	Root          string    `json:"root"`
+	Items         []Item    `json:"items"`
+	// Remaining are the items beyond the listed ones, for resolving a "select all".
+	Remaining        []Item           `json:"-"`
 	MoreItems        int              `json:"moreItems"`
 	MoreBytes        int64            `json:"moreBytes"`
 	Explanation      *Explanation     `json:"explanation,omitempty"`
@@ -153,8 +161,11 @@ type Input struct {
 	Explanations   map[int]ReceivedExplanation
 	Queued         map[int]bool
 	Expanded       map[string]bool
-	MinimumBytes   int64
-	Profile        string
+	// Deleted holds DeletedKey values of items deleted in this session; they are not
+	// listed again. Keys name scan nodes, so they stay valid when an export is rebuilt.
+	Deleted      map[string]bool
+	MinimumBytes int64
+	Profile      string
 }
 
 // Build produces the merged, sorted list.
@@ -166,6 +177,9 @@ func Build(input Input) Model {
 	var aiClassified int64
 	for _, imported := range input.Imported {
 		category := buildAICategory(input, imported, restorer)
+		if category.ItemCount == 0 && wasDeleted(input, imported) {
+			continue
+		}
 		aiClassified += category.Bytes
 		if imported.Category.Deletable {
 			model.Categories = append(model.Categories, category)
@@ -227,9 +241,13 @@ func buildRecipeCategories(input Input) ([]Category, int64) {
 				continue
 			}
 			node := input.Tree.Node(root)
+			if input.Deleted[DeletedKey(root, false)] {
+				continue
+			}
 			category.Items = append(category.Items, Item{Key: nodeKey(root),
 				Kind: itemKind(node.Kind, false), Bytes: bytes, Files: files,
-				Path: displayPath(input, root, false), Modified: modifiedOf(node)})
+				Path: displayPath(input, root, false), Modified: modifiedOf(node),
+				Node: root, Tier: scanner.TierKnown, ClaimID: claimID})
 		}
 	}
 	var categories []Category
@@ -302,14 +320,16 @@ func buildAICategory(input Input, imported ImportedCategory, restorer *restorer)
 	}
 	for _, id := range row.IDs {
 		item := input.Export.ItemByID(id)
-		if item == nil {
+		if item == nil || input.Deleted[DeletedKey(item.Node, item.Kind ==
+			prompt.ItemLooseContents)] {
 			continue
 		}
 		loose := item.Kind == prompt.ItemLooseContents
 		node := input.Tree.Node(item.Node)
 		entry := Item{Key: "id:" + itoa(id), Kind: itemKind(node.Kind, loose),
 			Bytes: item.Bytes, Files: item.Files, Path: displayPath(input, item.Node, loose),
-			Modified: modifiedOf(node)}
+			Modified: modifiedOf(node), Node: item.Node, Listed: item.Listed,
+			Tier: scanner.TierUnknown, ClaimID: scanner.NoClaim}
 		if exported := renderedPath(input, item.Node, loose); strings.Contains(exported, "<R") {
 			entry.ExportedAs = exported
 		}
@@ -359,6 +379,7 @@ func finishItems(category *Category) {
 			category.MoreBytes += item.Bytes
 		}
 		category.MoreItems = len(category.Items) - maximumListedItems
+		category.Remaining = category.Items[maximumListedItems:]
 		category.Items = category.Items[:maximumListedItems]
 	}
 	if category.Items == nil {
@@ -428,3 +449,24 @@ func renderedPath(input Input, index scanner.NodeIndex, loose bool) string {
 }
 
 func nodeKey(index scanner.NodeIndex) string { return "node:" + itoa(int(index)) }
+
+// wasDeleted reports whether any of the category's items was deleted in this session, so
+// a category emptied by deleting is no longer listed.
+func wasDeleted(input Input, imported ImportedCategory) bool {
+	for _, id := range imported.Category.IDs {
+		if item := input.Export.ItemByID(id); item != nil && input.Deleted[DeletedKey(
+			item.Node, item.Kind == prompt.ItemLooseContents)] {
+			return true
+		}
+	}
+	return false
+}
+
+// DeletedKey names a deleted item by its scan node: the node itself, or a folder's loose
+// contents.
+func DeletedKey(node scanner.NodeIndex, loose bool) string {
+	if loose {
+		return "loose:" + itoa(int(node))
+	}
+	return "node:" + itoa(int(node))
+}

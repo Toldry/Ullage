@@ -348,3 +348,48 @@ export interface ResultsView {
   explanationRound: number;
   minimumItemBytes: number;
 }
+
+// Deletion (internal/session/deletion.go, internal/deletion)
+export type DeletionStatus =
+  | 'ready' | 'changed' | 'missing' | 'protected' | 'rejected'
+  | 'recycled' | 'deleted' | 'failed' | 'partial' | 'skipped';
+
+export interface DeletionItem {
+  key: string;
+  category: string;
+  categoryName: string;
+  path: string;
+  kind: string;
+  bytes: number;
+  status: DeletionStatus;
+  reason?: string;
+  nowBytes?: number;
+}
+
+export interface Tally {
+  count: number;
+  bytes: number;
+}
+
+export interface DeletionPlan {
+  id: string;
+  items: DeletionItem[];
+  ready: Tally;
+  changed: Tally;
+  missing: Tally;
+  refused: Tally;
+  confirmation: string;
+}
+
+export interface DeletionRun {
+  permanent: boolean;
+  total: number;
+  done: number;
+  stopping: boolean;
+  finished: boolean;
+  items: DeletionItem[];
+  removed: Tally;
+  failed: Tally;
+  skipped: Tally;
+  pending: Tally;
+}

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/toldry/ullage/internal/deletion"
 	"github.com/toldry/ullage/internal/overview"
 	"github.com/toldry/ullage/internal/platform"
 	"github.com/toldry/ullage/internal/protect"
@@ -48,6 +49,11 @@ type Environment struct {
 	Protector protect.Protector
 	// SensitiveWords are always redacted: account names and the machine name.
 	SensitiveWords []string
+	// Remover deletes; Canonical normalizes paths for the deletion guard; ProtectedTrees
+	// are never deleted from (safety rule 4).
+	Remover        deletion.Remover
+	Canonical      func(string) string
+	ProtectedTrees []string
 }
 
 // NativeEnvironment wires the real platform implementation.
@@ -64,6 +70,9 @@ func NativeEnvironment(configDirectory string) Environment {
 		ConfigDirectory:       configDirectory,
 		Protector:             protect.Native(configDirectory),
 		SensitiveWords:        sensitiveWords(platform.DiscoverKnownLocations()),
+		Remover:               deletion.PermanentRemover{Reader: platform.NewDirectoryReader()},
+		Canonical:             platform.CanonicalPath,
+		ProtectedTrees:        platform.ProtectedTrees(platform.DiscoverKnownLocations()),
 	}
 }
 
@@ -129,6 +138,7 @@ type Manager struct {
 	log         *eventLog
 	redaction   redactionState
 	exportState exportState
+	deletion    deletionState
 }
 
 // NewManager loads the recipe library and saved config.
@@ -213,6 +223,9 @@ func (manager *Manager) StartScan(request ScanRequest) error {
 	defer manager.lock.Unlock()
 	if manager.state == StateRunning {
 		return ErrScanRunning
+	}
+	if manager.deletion.running() {
+		return ErrDeletionRunning
 	}
 	manager.config.IncludeOtherProfiles = request.IncludeOtherProfiles
 	manager.config.Exclusions = cleanPatterns(request.Exclusions)
@@ -352,6 +365,7 @@ func (manager *Manager) awaitScan(current *running, restorePriority func()) {
 		}
 		manager.state = StateFinished
 		manager.resetRedactionForNewScan()
+		manager.deletion = deletionState{}
 	}
 }
 

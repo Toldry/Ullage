@@ -9,6 +9,7 @@ import { OverviewScreen } from './screens/OverviewScreen';
 import { ExportScreen } from './screens/ExportScreen';
 import { PasteScreen } from './screens/PasteScreen';
 import { ResultsScreen } from './screens/ResultsScreen';
+import { DeleteDialog } from './screens/DeleteDialog';
 import { pruneSelection } from './lib/results';
 import { RedactScreen } from './screens/RedactScreen';
 import { RulesScreen } from './screens/RulesScreen';
@@ -44,6 +45,7 @@ export function App() {
   const [deletionSelection, setDeletionSelection] = useState<Set<string>>(new Set());
   const onResultsLoaded = useCallback((categories: ResultCategory[]) =>
     setDeletionSelection((previous) => pruneSelection(categories, previous)), []);
+  const [resultsRefresh, setResultsRefresh] = useState(0);
   const appElement = useRef<HTMLDivElement>(null);
 
   // Any rejected session (wrong or missing token) switches to the invalid-link state.
@@ -141,14 +143,16 @@ export function App() {
     if (result) setError('Relaunching as administrator. A new tab will open; close this one.');
   }, [guard]);
 
-  const reachedStep = overview ? 6 : 1;
+  const reachedStep = overview ? (deletionSelection.size > 0 ? 7 : 6) : 1;
 
   const navigate = useCallback((target: Screen) => {
     if (target === 'scan' && screen === 'scanning') return;
-    const needsScan: Screen[] = ['overview', 'redact', 'export', 'paste', 'results'];
+    if (screen === 'delete') return;
+    const needsScan: Screen[] = ['overview', 'redact', 'export', 'paste', 'results', 'delete'];
     if (needsScan.includes(target) && !overview) return;
+    if (target === 'delete' && deletionSelection.size === 0) return;
     if ([...needsScan, 'scan', 'rules'].includes(target)) setScreen(target);
-  }, [screen, overview]);
+  }, [screen, overview, deletionSelection]);
 
   const startFromKeyboard = useCallback(() => {
     const roots = volumes.filter((volume) => selected.has(volume.root)).map((v) => v.root);
@@ -288,11 +292,21 @@ export function App() {
               onGoExport={() => setScreen('export')}
               onGoResults={() => setScreen('results')} />
           )}
-          {screen === 'results' && (
+          {(screen === 'results' || screen === 'delete') && (
             <ResultsScreen guard={guard} selection={deletionSelection}
               onSelectionChange={setDeletionSelection} onResultsLoaded={onResultsLoaded}
               onGoExport={(round) => { setBatch(round); setScreen('export'); }}
-              onRescan={() => { setError(''); setScreen('scan'); }} />
+              onRescan={() => { setError(''); setScreen('scan'); }}
+              onReviewDeletion={() => setScreen('delete')} refreshToken={resultsRefresh}
+              inactive={screen === 'delete'} />
+          )}
+          {screen === 'delete' && (
+            <DeleteDialog guard={guard} keys={[...deletionSelection]}
+              volumeName={statusVolume?.name ?? 'this drive'}
+              onClose={(changed) => {
+                setScreen('results');
+                if (changed) setResultsRefresh((previous) => previous + 1);
+              }} />
           )}
         </Main>
       </div>

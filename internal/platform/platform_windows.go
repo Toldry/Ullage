@@ -217,8 +217,12 @@ func parseRecord(record []byte, informationClass uint32, volume uint64) (Directo
 	}
 	// WOF (CompactOS) and deduplicated files report misleading allocation in the directory
 	// entry; mark them so completeEntry asks the file system directly.
-	if isReparse && (raw.reparseTag == ioReparseTagWof || raw.reparseTag == ioReparseTagDedup) {
+	compression := raw.reparseTag == ioReparseTagWof || raw.reparseTag == ioReparseTagDedup
+	if isReparse && compression {
 		entry.Attributes |= AttributeCompressed
+	}
+	if isReparse && !isLink && !compression {
+		entry.Attributes |= AttributeManagedReparsePoint
 	}
 	return entry, true
 }

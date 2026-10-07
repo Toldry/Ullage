@@ -2300,3 +2300,304 @@ h1 {
 .results-row:focus {
   outline: none;
 }
+
+/* Delete dialog (step 7) */
+.dialog-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--scrim);
+}
+
+.dialog {
+  width: 920px;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dialog-heading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dialog-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.kbd-button {
+  cursor: pointer;
+  background: none;
+}
+
+.tally-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-bottom: 1px solid var(--line);
+}
+
+.tally-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 18px;
+}
+
+.tally-cell + .tally-cell {
+  border-left: 1px solid var(--line);
+}
+
+.tally-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+}
+
+.tally-value {
+  font-family: var(--font-mono);
+  font-size: 17px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.status-ok {
+  background: var(--ok);
+}
+
+.status-bad {
+  background: var(--bad);
+}
+
+.status-warn {
+  background: var(--warn);
+}
+
+.status-none {
+  border: 1px solid var(--fg3);
+}
+
+.tone-text-ok,
+.tone-text-none {
+  color: var(--fg2);
+}
+
+.tone-text-bad {
+  color: var(--bad);
+}
+
+.tone-text-warn {
+  color: var(--warn);
+}
+
+.run-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dialog-table-head,
+.dialog-row {
+  display: grid;
+  grid-template-columns: 156px minmax(0, 1fr) 110px;
+  gap: 14px;
+  padding: 7px 18px;
+}
+
+.dialog-table-head {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg3);
+}
+
+.dialog-rows {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.dialog-row {
+  align-items: start;
+  border-bottom: 1px solid var(--line);
+}
+
+.dialog-row.row-bad {
+  background: var(--bad-bg);
+}
+
+.row-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.row-path {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wrap-text {
+  overflow-wrap: anywhere;
+}
+
+.row-size {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.dialog-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--line);
+}
+
+.option-pair {
+  display: flex;
+  gap: 10px;
+}
+
+.option-card {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line2);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.option-card.selected {
+  border-color: var(--fg2);
+  background: var(--bg3);
+}
+
+.option-card.danger {
+  border-color: var(--bad-bd);
+  background: var(--bad-bg);
+}
+
+.option-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.normal-weight {
+  font-weight: 400;
+}
+
+.radio-dot {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  flex: none;
+  border: 1px solid var(--line2);
+  border-radius: 50%;
+}
+
+.radio-dot.on {
+  border: 4px solid var(--fg);
+}
+
+.confirm-permanent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  border: 1px solid var(--bad-bd);
+  background: var(--bad-bg);
+  border-radius: 6px;
+}
+
+.confirm-permanent > span {
+  flex: 1;
+}
+
+.confirm-input {
+  width: 180px;
+  height: 30px;
+  padding: 0 10px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--bad-bd);
+  border-radius: 4px;
+  outline: none;
+}
+
+.dialog-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--bg2);
+}
+
+.grow {
+  flex: 1;
+}
+
+.button-danger {
+  height: 34px;
+  padding: 0 14px;
+  color: var(--onbad);
+  background: var(--bad);
+  border: none;
+  border-radius: 5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button-danger:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.dialog:focus {
+  outline: none;
+}

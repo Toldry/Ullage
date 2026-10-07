@@ -128,12 +128,13 @@ ullage/
 │   ├── prompt/              Unknown tier → numbered, redacted, batched prompt text
 │   ├── response/            tolerant reply extraction, strict validation, repair prompts
 │   ├── results/             recipe + AI categories merged, names restored for display
+│   ├── deletion/            guard, re-verification, Recycle Bin / permanent delete
 │   ├── session/             per-launch state: scan, code, log, redaction, export, results
 │   ├── server/              HTTP handlers, token/Host/Origin guard, SSE progress
 │   ├── storage/             config file, atomic writes
 │   └── nonetwork/           runtime guard that disables outbound HTTP and DNS
 │   ├── scanner/scannertest/ in-memory file system for tests
-│   (later phases add deletion/, history/)
+│   (Phase 6 adds history/)
 ├── web/                     Preact + TypeScript UI; dist/ is embedded by package web
 ├── tools/nonetwork/         build check: forbids outbound network APIs (see §6)
 ├── tools/tokenestimate/     DEV ONLY: token estimate for prompts of a sample scan
@@ -238,21 +239,31 @@ Step by step:
 
 ## 5. Deletion guard (safety rules 3-6)
 
-A deletion request is a list of `ItemID`s. Each item passes, in order:
+The browser sends selection keys (category plus item, never a path). `session` resolves
+them against the current Results; a key that names nothing deletable is refused by name,
+not dropped. Each resolved item becomes a `deletion.Target` (a scan node, its kind, and
+the tier and claim it must belong to) and passes, both when the confirmation screen
+opens and again immediately before it is deleted:
 
-1. Exists in the current session's scan (otherwise rejected, not "skipped").
-2. Tier is Known or Unknown, never System.
-3. Its resolved, normalized long path is not under `%SystemRoot%`, `Program Files`,
-   `Program Files (x86)` (resolved via Known Folder APIs, not hard-coded drive letters), and is
-   inside one of the scanned roots. Comparison is case-insensitive on the final path after
-   resolving `\\?\`, 8.3 short names, and trailing dots/spaces.
-4. If it matches a recipe with brute-force disallowed, only managed steps are offered.
-5. Re-stat: allocated size and last-write time must equal the scan values (for directories,
-   a re-walk compares totals); any change blocks that item.
-6. Recycle Bin by default; permanent deletion needs a second explicit confirmation.
-
-Per-item outcomes (deleted, blocked-changed, blocked-protected, locked, failed) are returned
-and shown exactly.
+1. **Policy.** Its category must be selectable: a recipe that allows brute force, or an
+   AI category marked `del 1` whose explanation was imported (D-050) and, if low
+   confidence, whose row was opened (D-048).
+2. **Scan.** Everything it would delete belongs to its own tier and claim (so never to
+   the System tier or another category), and nothing in it was excluded, unreadable,
+   cloud-only or managed by another program through a reparse point (D-052).
+3. **Location.** Strictly inside a scanned root; not inside `%SystemRoot%`, Program Files
+   or Program Files (x86) (from the Known Folder API); not a profile, the profiles folder,
+   Ullage's configuration or any folder containing one. Paths are compared canonically:
+   no `\\?\`, short names expanded, trailing dots and spaces removed, case-insensitive.
+4. **Identity.** Every folder from the scanned root down to the item is still the same
+   folder (file ID) and not a link; the item itself is the same file or folder.
+5. **Unchanged.** A re-walk that never follows links matches the scan: files, folders,
+   links, logical size and newest modification; allocated size for single files (D-051).
+6. **Delete.** Recycle Bin by default; permanent deletion needs the typed confirmation
+   `delete N`, checked by the server. Permanent deletion walks folders itself and
+   removes links as links (D-054, D-055).
+7. **Report.** The disk is checked afterwards: removed, failed with nothing changed,
+   partly removed, or blocked (changed, missing, protected, refused).
 
 ---
 

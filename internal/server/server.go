@@ -140,6 +140,11 @@ func (server *Server) apiRoutes() map[string]route {
 		"/api/results":         {method: http.MethodGet, handler: server.handleResults},
 		"/api/results/explain": {method: http.MethodPost, handler: server.handleRequestExplanation},
 		"/api/results/expand":  {method: http.MethodPost, handler: server.handleExpand},
+		"/api/delete/prepare": {method: http.MethodPost, handler: server.handlePrepareDeletion,
+			maximumBodyBytes: maximumPasteBytes},
+		"/api/delete/execute":  {method: http.MethodPost, handler: server.handleExecuteDeletion},
+		"/api/delete/progress": {method: http.MethodGet, handler: server.handleDeletionProgress},
+		"/api/delete/stop":     {method: http.MethodPost, handler: server.handleStopDeletion},
 	}
 }
 

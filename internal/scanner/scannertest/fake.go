@@ -5,6 +5,7 @@ package scannertest
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -64,6 +65,67 @@ func (fileSystem *FileSystem) AddFile(slashPath string, bytes int64, modifiedUni
 			AllocatedBytes: bytes, LogicalBytes: bytes, LinkCount: 1,
 			ModifiedUnixNanos: modifiedUnixNanos, CreatedUnixNanos: modifiedUnixNanos,
 			ID: platform.FileID{Volume: 1, Low: fileSystem.nextID}})
+}
+
+// AddLink creates a link entry (a junction or symbolic link), which is never followed.
+func (fileSystem *FileSystem) AddLink(slashPath, target string) {
+	path := filepath.FromSlash(slashPath)
+	parent := filepath.Dir(path)
+	fileSystem.ensureDirectory(parent)
+	fileSystem.nextID++
+	fileSystem.directories[parent] = append(fileSystem.directories[parent],
+		platform.DirectoryEntry{Name: filepath.Base(path), Kind: platform.EntryLink,
+			LinkTarget: target, ID: platform.FileID{Volume: 1, Low: fileSystem.nextID}})
+}
+
+// Remove deletes an entry and everything below it.
+func (fileSystem *FileSystem) Remove(slashPath string) {
+	fileSystem.lock.Lock()
+	defer fileSystem.lock.Unlock()
+	path := filepath.FromSlash(slashPath)
+	fileSystem.removeLocked(path)
+}
+
+func (fileSystem *FileSystem) removeLocked(path string) {
+	parent := filepath.Dir(path)
+	entries := fileSystem.directories[parent]
+	for index, entry := range entries {
+		if entry.Name == filepath.Base(path) {
+			fileSystem.directories[parent] = append(entries[:index:index], entries[index+1:]...)
+			break
+		}
+	}
+	for candidate := range fileSystem.directories {
+		if candidate == path || strings.HasPrefix(candidate, path+string(filepath.Separator)) {
+			delete(fileSystem.directories, candidate)
+		}
+	}
+}
+
+// Exists reports whether an entry exists.
+func (fileSystem *FileSystem) Exists(slashPath string) bool {
+	fileSystem.lock.Lock()
+	defer fileSystem.lock.Unlock()
+	path := filepath.FromSlash(slashPath)
+	for _, entry := range fileSystem.directories[filepath.Dir(path)] {
+		if entry.Name == filepath.Base(path) {
+			return true
+		}
+	}
+	return false
+}
+
+// Touch changes an entry's modification time, as writing to it would.
+func (fileSystem *FileSystem) Touch(slashPath string, modifiedUnixNanos int64) {
+	fileSystem.lock.Lock()
+	defer fileSystem.lock.Unlock()
+	path := filepath.FromSlash(slashPath)
+	entries := fileSystem.directories[filepath.Dir(path)]
+	for index := range entries {
+		if entries[index].Name == filepath.Base(path) {
+			entries[index].ModifiedUnixNanos = modifiedUnixNanos
+		}
+	}
 }
 
 // Rename moves an entry, keeping its file ID, the way a rename within a volume does.

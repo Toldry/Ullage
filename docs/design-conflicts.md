@@ -24,3 +24,5 @@ Each conflict below was reported when found.
 | 16 | AI items cannot be selected until an explanation arrives | Explanations are lazy; only low confidence gates delete | Design rule adopted on review (D-050) | Phase 4 |
 | 17 | Empty state offers "Lower threshold to 10 MB" and "Scan D: instead" | Changing the threshold rebuilds the prompt and discards imported replies | "Scan again" and "Browse classified items"; the threshold stays in settings | Phase 4 |
 | 18 | WSL distro images listed as "recipes say keep" | The WSL recipe has managed cleanup steps | Listed as "Managed cleanup only", like Docker | Phase 4 |
+| 19 | Confirmation shows Ready / Blocked · changed / Missing | Items can also be refused or protected (D-052, D-058) | "Blocked · changed or refused" counts both; each row says why | Phase 5 |
+| 20 | Rows show IFileOperation-style per-file progress | Shell API with per-item outcomes checked on disk | One shell call per item; outcome verified afterwards (D-054) | Phase 5 |

@@ -10,7 +10,7 @@ for review. Status is updated as phases land.
 | 2 | Redaction engine, encrypted rules store, redaction review and rules screens; dates, file types and non-developer recipes | Leak test, fail-closed test, rename-following | Done, approved |
 | 3 | Prompt builder, parser, validator, repair prompts, Export and Paste screens | Parser fixtures, injection, token estimator | Done, approved |
 | 4 | Results screen, round B explanations, low-confidence gating | Merge and sort, round B parser | Done, approved |
-| 5 | Deletion pipeline and confirmation screen | Guard refusals, change detection, partial failures | Planned |
+| 5 | Deletion pipeline and confirmation screen | Guard refusals, change detection, partial failures | Done, awaiting review |
 | 6 | History, all design states, packaging, Start menu shortcut, README | End-to-end on Windows CI | Planned |
 
 ## Phase 0 summary
@@ -165,3 +165,42 @@ Deviations reported: D-043 to D-050; design conflicts 15 to 18.
 
 Review outcome: approved; D-050 resolved the strict way (an AI category needs its
 explanation before it can be selected).
+
+## Phase 5 summary
+
+Built:
+
+- `deletion`: the guard (policy, scan purity, protected locations, ancestor identity,
+  re-walk fingerprint), deletion through the Recycle Bin or a permanent walk that never
+  follows links, outcomes checked on disk, and a background run with stop
+  (D-051 to D-056). Loose contents resolved (D-053).
+- `platform`: `MoveToRecycleBin` (SHFileOperationW on Windows, freedesktop Trash on
+  Linux), `CanonicalPath`, `ProtectedTrees`, in-use detection, and a flag for entries
+  managed through non-link reparse points.
+- Session and API: prepare (verify a selection), execute (typed confirmation for
+  permanent), progress, stop; deleted items leave Results (D-057).
+- Delete dialog (step 7) per the design: confirmation with per-item verification, Recycle
+  Bin or permanent with typed confirmation, progress with stop, and the final report with
+  copy error log and retry.
+
+Tested:
+
+- Required refusals: keys not in the current results (unknown category or item, another
+  category's item, text instead of an ID), categories not allowed (kept, unexplained,
+  managed only), System tier (also outside protected folders), the Windows folder and
+  Program Files, profiles and their parents, scanned roots, items outside the roots,
+  recipe folders holding other categories, excluded, unreadable, cloud-only and managed
+  items.
+- Changes since the scan: modified, file added or removed, link added, missing,
+  replaced, a parent folder swapped for a link, and a change between confirmation and
+  deletion; loose contents changes.
+- Execution: recycle, permanent with typed confirmation, wrong or forged confirmations
+  and plans, plan reuse, in-use failure with nothing changed, partial failure, stop after
+  current item; links inside deleted folders keep their targets (real junctions on
+  Windows CI, symbolic links on Linux); the real Recycle Bin and Trash.
+- Mutation check: disabling the ancestor check or the System-tier check makes tests fail.
+- Headless Chromium on a disposable copy of the fixture: select, confirm (one item
+  blocked as changed), recycle, done, results refreshed, permanent delete with typed
+  confirmation; no console errors or remote requests.
+
+Deviations reported: D-051 to D-057; design conflicts 19 and 20.
