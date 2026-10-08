@@ -88,6 +88,8 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
       else if (event.key === 'x') toggleSelected(current);
       else if ((event.key === 'd' || event.key === 'D') && selection.size > 0) {
         onReviewDeletion();
+      } else if ((event.key === 'e' || event.key === 'E') && view && view.queuedCount > 0) {
+        onGoExport(view.explanationRound);
       } else return;
       event.preventDefault();
     };
@@ -130,6 +132,22 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
         )}
       </div>
 
+      {view.queuedCount > 0 && (
+        <div class="queued-note">
+          <span class="grow">
+            <span class="mono strong">{view.queuedCount}</span>{' '}
+            {view.queuedCount === 1 ? 'explanation' : 'explanations'} queued for round{' '}
+            {view.explanationRound}. Copy the prompt into the same conversation as the
+            batches, then paste the reply in step 5.
+          </span>
+          <button type="button" class="button button-primary button-with-key"
+            onClick={() => onGoExport(view.explanationRound)}>
+            Export explanation prompt
+            <Kbd inverse>E</Kbd>
+          </button>
+        </div>
+      )}
+
       {view.categories.length === 0 ? (
         <EmptyResults view={view} keptBytes={keptBytes} onRescan={onRescan}
           onShowKept={() => setShowKept(true)} />
@@ -166,15 +184,6 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
               <option value="no">no</option>
             </select>
           </label>
-          {view.queuedCount > 0 && (
-            <div class="queued-note">
-              <span class="mono strong">{view.queuedCount}</span>
-              {view.queuedCount === 1 ? 'explanation' : 'explanations'} queued for export
-              round {view.explanationRound}
-              <button type="button" class="link-button"
-                onClick={() => onGoExport(view.explanationRound)}>Export</button>
-            </div>
-          )}
           <span class="spacer" />
           <span class="cell-mono muted">
             {totals.items ? `${pluralize(totals.items, 'item')} · ${formatBytes(totals.bytes)} ` +
@@ -212,7 +221,8 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
                 else next.add(key);
                 onSelectionChange(next);
               }}
-              onRequestExplanation={(queued) => void requestExplanation(category, queued)} />
+              onRequestExplanation={(queued) => void requestExplanation(category, queued)}
+              onGoExport={() => onGoExport(view.explanationRound)} />
           ))}
         </div>
       )}
@@ -228,7 +238,7 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
             {formatBytes(keptBytes)} in {pluralize(view.kept.length, 'category',
               'categories')} the AI suggests keeping
           </button>
-        </>}. Keys: j / k move, Enter expand, x select.
+        </>}. Keys: j / k move, Enter expand, x select, E export explanations, D review deletion.
       </div>
     </div>
   );
@@ -291,6 +301,7 @@ function CategoryRow(props: {
   onToggleSelected: () => void;
   onToggleItem: (key: string) => void;
   onRequestExplanation: (queued: boolean) => void;
+  onGoExport: () => void;
 }) {
   const { category } = props;
   const state = selectionState(category, props.selection);
@@ -402,6 +413,7 @@ function CategoryDetail(props: {
   onToggleSelected: () => void;
   onToggleItem: (key: string) => void;
   onRequestExplanation: (queued: boolean) => void;
+  onGoExport: () => void;
 }) {
   const { category } = props;
   const explanation = category.explanation;
@@ -426,7 +438,13 @@ function CategoryDetail(props: {
                   'Requesting adds this category to the next export round; nothing is sent ' +
                   'until you copy that prompt.'}
             </div>
-            <div>
+            <div class="actions">
+              {category.explanationState === 'queued' && (
+                <button type="button" class="button button-primary button-small"
+                  onClick={props.onGoExport}>
+                  Export explanation prompt
+                </button>
+              )}
               <button type="button" class="button button-small"
                 onClick={() => props.onRequestExplanation(
                   category.explanationState !== 'queued')}>
