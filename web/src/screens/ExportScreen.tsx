@@ -3,8 +3,7 @@ import { Kbd } from '../components/Controls';
 import { SessionExpiredError } from '../lib/api';
 import { copyText } from '../lib/clipboard';
 import { exportApi } from '../lib/exporting';
-import { roundsOf, roundTitle } from '../lib/results';
-import { formatBytes, formatCount, pluralize } from '../lib/format';
+import { formatBytes, formatCount } from '../lib/format';
 import { placeholderSegments } from '../lib/redaction';
 import type { ExportView } from '../lib/types';
 
@@ -37,9 +36,8 @@ export function ExportScreen({ guard, batch, onBatchChange, onGoPaste, onExportL
     })();
   }, [guard, onExportLoaded]);
 
-  const rounds = view ? roundsOf(view) : [];
-  const current = rounds[Math.min(batch, rounds.length) - 1];
-  const explaining = current?.kind === 'explain';
+  const batches = view?.batches ?? [];
+  const current = batches[Math.min(batch, batches.length) - 1];
 
   const copy = async () => {
     if (!current) return;
@@ -95,9 +93,9 @@ export function ExportScreen({ guard, batch, onBatchChange, onGoPaste, onExportL
     <div class="screen screen-wide">
       <div class="screen-header">
         <ExportHeading />
-        <BatchStepper count={rounds.length} current={current.number}
-          title={roundTitle(current, view.batches.length)}
-          done={(number) => rounds[number - 1].imported} onPick={onBatchChange} />
+        <BatchStepper count={totalBatches} current={current.number}
+          title={`Batch ${current.number} of ${totalBatches}`}
+          done={(number) => batches[number - 1].imported} onPick={onBatchChange} />
       </div>
 
       {view.stale && (
@@ -118,8 +116,7 @@ export function ExportScreen({ guard, batch, onBatchChange, onGoPaste, onExportL
           <div class="panel-header export-header">
             <span>Exact text to be copied</span>
             <span class="cell-mono faint normal-case">
-              {explaining ? pluralize(current.items, 'category', 'categories')
-                : `${formatCount(current.items)} items`} ·{' '}
+              {formatCount(current.items)} items ·{' '}
               {formatCount(current.characters)} chars ·
               ≈{formatTokens(current.tokenEstimate)} tokens
             </span>
@@ -149,8 +146,7 @@ export function ExportScreen({ guard, batch, onBatchChange, onGoPaste, onExportL
           <div class="panel panel-raised copy-card">
             <button type="button" class="button button-primary button-large copy-button"
               onClick={copy}>
-              {explaining ? 'Copy explanation prompt'
-                : current.number === 1 ? 'Copy prompt' : `Copy batch ${current.number}`}
+              {current.number === 1 ? 'Copy prompt' : `Copy batch ${current.number}`}
               <Kbd inverse>Ctrl C</Kbd>
             </button>
             <div class="small faint">
@@ -160,18 +156,7 @@ export function ExportScreen({ guard, batch, onBatchChange, onGoPaste, onExportL
           </div>
           <div class="panel steps-card">
             <div class="section-title">Then</div>
-            {explaining ? (
-              <>
-                <Step number={1}
-                  text="Paste this into the same conversation as the batches." />
-                <Step number={2} text="Copy the reply and paste it in step 5." />
-                <div class="small muted">
-                  It asks for short explanations of the categories you requested on the
-                  Results screen. Only their numbers, the assistant's own names and IDs are
-                  in it.
-                </div>
-              </>
-            ) : current.number === 1 ? (
+            {current.number === 1 ? (
               <>
                 <Step number={1}
                   text="Open a new conversation in any assistant: Claude, ChatGPT, or another." />
@@ -183,6 +168,10 @@ export function ExportScreen({ guard, batch, onBatchChange, onGoPaste, onExportL
                     on the instructions in batch 1.
                   </div>
                 )}
+                <div class="small muted">
+                  The reply explains each category it suggests deleting: what it is, what
+                  is lost, and how to free the space safely.
+                </div>
               </>
             ) : (
               <>
@@ -192,20 +181,14 @@ export function ExportScreen({ guard, batch, onBatchChange, onGoPaste, onExportL
             )}
           </div>
           <div class="panel">
-            {rounds.map((item) => (
+            {batches.map((item) => (
               <button type="button" key={item.number}
                 class={`batch-row${item.number === current.number ? ' active' : ''}`}
                 onClick={() => onBatchChange(item.number)}>
-                <span>
-                  {item.kind === 'explain' ? `Round ${item.number}` : `Batch ${item.number}`}
-                </span>
-                <span class="cell-mono faint">
-                  {item.kind === 'explain' ? `${formatCount(item.items)} to explain`
-                    : `${formatCount(item.items)} items`}
-                </span>
+                <span>Batch {item.number}</span>
+                <span class="cell-mono faint">{formatCount(item.items)} items</span>
                 <span class={`small ${item.imported ? 'ok-text' : 'faint'}`}>
-                  {item.imported ? `imported · ${item.categoryCount} ` +
-                    (item.kind === 'explain' ? 'explained' : 'categories')
+                  {item.imported ? `imported · ${item.categoryCount} categories`
                     : item.number === current.number ? 'ready to copy' : 'not imported'}
                 </span>
               </button>
@@ -232,7 +215,7 @@ export function ExportScreen({ guard, batch, onBatchChange, onGoPaste, onExportL
 function ExportHeading() {
   return (
     <div class="heading">
-      <div class="step-label">Step 4 of 7</div>
+      <div class="step-label">Step 4 of 6</div>
       <h1>Export prompt</h1>
       <p class="lead">
         This text is the only thing that leaves your machine, and it leaves through your

@@ -11,8 +11,17 @@ var batchOne = Expectation{Code: "7KQX2M", Batch: 1, BatchCount: 3, FirstID: 1, 
 const validReply = `@SESSION 7KQX2M
 cat|conf|regen|del|ids
 Node.js dependency folders|high|yes|1|3-33
+what: Packages npm installed for JavaScript projects.
+lost: Nothing; npm install restores them.
+step: Run npm prune in each project, or delete the folder.
 Build outputs|med|yes|1|34,40-42
+what: Compiler output.
+lost: Nothing; the next build recreates it.
+step: Rebuild when needed.
 @END 7KQX2M`
+
+// explanation is a minimal valid explanation for a deletable row.
+const explanation = "\nwhat: Files.\nlost: Nothing.\nstep: Delete it."
 
 func checksFailed(result Result) []Check {
 	var failed []Check
@@ -30,7 +39,9 @@ func TestValidReply(t *testing.T) {
 		t.Fatalf("result = %+v", result)
 	}
 	want := Category{Name: "Build outputs", Confidence: ConfidenceMedium,
-		Regenerable: RegenerableYes, Deletable: true, IDs: []int{34, 40, 41, 42}, Line: 4}
+		Regenerable: RegenerableYes, Deletable: true, IDs: []int{34, 40, 41, 42}, Line: 7,
+		What: "Compiler output.", Lost: "Nothing; the next build recreates it.",
+		Steps: []string{"Rebuild when needed."}}
 	if !reflect.DeepEqual(result.Categories[1], want) {
 		t.Fatalf("category = %+v", result.Categories[1])
 	}
@@ -54,8 +65,9 @@ func TestTolerantInput(t *testing.T) {
 		"bold markers": strings.NewReplacer("@SESSION 7KQX2M", "**@SESSION 7KQX2M**",
 			"@END 7KQX2M", "**@END 7KQX2M**").Replace(validReply),
 		"markdown table": "@SESSION 7KQX2M\n| cat | conf | regen | del | ids |\n" +
-			"|---|---|---|---|---|\n| Node.js dependency folders | high | yes | 1 | 3-33 |\n" +
-			"| Build outputs | med | yes | 1 | 34, 40-42 |\n@END 7KQX2M",
+			"|---|---|---|---|---|\n| Node.js dependency folders | high | yes | 1 | 3-33 |" +
+			explanation + "\n| Build outputs | med | yes | 1 | 34, 40-42 |" + explanation +
+			"\n@END 7KQX2M",
 		"prompt pasted before the reply": "@SESSION EXAMPL\ncat|conf|regen|del|ids\n" +
 			"Old program installers|high|yes|1|1,4\n@END EXAMPL\n\n" + validReply,
 	}
@@ -71,8 +83,8 @@ func TestTolerantInput(t *testing.T) {
 }
 
 func TestPipeInsideCategoryName(t *testing.T) {
-	result := Parse("@SESSION 7KQX2M\nCaches | temporary files|high|yes|1|1-3\n@END 7KQX2M",
-		batchOne)
+	result := Parse("@SESSION 7KQX2M\nCaches | temporary files|high|yes|1|1-3"+
+		explanation+"\n@END 7KQX2M", batchOne)
 	if !result.Valid() || result.Categories[0].Name != "Caches | temporary files" {
 		t.Fatalf("result = %+v", result)
 	}
@@ -104,7 +116,8 @@ func TestDetectedErrors(t *testing.T) {
 			[]Check{CheckComplete, CheckFormat}, "expected 5 columns"},
 		{"bad enums", "@SESSION 7KQX2M\nCaches|very high|maybe|yes|1\n@END 7KQX2M",
 			[]Check{CheckFormat}, `conf must be high, med or low, not "very high"`},
-		{"overlapping IDs", "@SESSION 7KQX2M\nA|high|yes|1|1-10\nB|low|no|0|8-12\n@END 7KQX2M",
+		{"overlapping IDs", "@SESSION 7KQX2M\nA|high|yes|1|1-10" + explanation +
+			"\nB|low|no|0|8-12\n@END 7KQX2M",
 			[]Check{CheckDuplicates}, `IDs 8-10 are also in "A"`},
 		{"unknown IDs", "@SESSION 7KQX2M\nA|high|yes|1|49-51,713\n@END 7KQX2M",
 			[]Check{CheckItemIDs}, "IDs 49-51, 713 are not in this batch, which has IDs 1-50"},
@@ -152,9 +165,87 @@ func TestRepliesCannotEscapeTheClosedVocabulary(t *testing.T) {
 	}
 	// A category name is free text, but it is only ever a label: the categories carry IDs
 	// of this batch and enum values, nothing else.
-	result := Parse("@SESSION 7KQX2M\nDelete C:\\Windows now|high|yes|1|1-2\n@END 7KQX2M",
-		batchOne)
+	result := Parse("@SESSION 7KQX2M\nDelete C:\\Windows now|high|yes|1|1-2"+explanation+
+		"\n@END 7KQX2M", batchOne)
 	if !result.Valid() || !reflect.DeepEqual(result.Categories[0].IDs, []int{1, 2}) {
 		t.Fatalf("result = %+v", result)
+	}
+}
+
+func TestExplanationsBelowRows(t *testing.T) {
+	reply := "@SESSION 7KQX2M\ncat|conf|regen|del|ids\n" +
+		"Old installers|high|yes|1|1-2\n" +
+		"- **What:** Setup files you downloaded.\n" +
+		"- **Lost:** Nothing \u201cimportant\u201d.\n" +
+		"- Step 1: Check you do not need them.\n" +
+		"step: Delete | or move them.\n" +
+		"Family photos|high|no|0|3\n" +
+		"what: Photos.\n" +
+		"@END 7KQX2M"
+	result := Parse(reply, batchOne)
+	if !result.Valid() || len(result.Categories) != 2 {
+		t.Fatalf("result = %+v", result)
+	}
+	installers := result.Categories[0]
+	if installers.What != "Setup files you downloaded." ||
+		installers.Lost != `Nothing "important".` ||
+		!reflect.DeepEqual(installers.Steps, []string{"Check you do not need them.",
+			"Delete | or move them."}) {
+		t.Fatalf("explanation = %+v", installers)
+	}
+	// A category to keep may be explained, but need not be.
+	if result.Categories[1].What != "Photos." || result.Categories[1].Lost != "" {
+		t.Fatalf("keep category = %+v", result.Categories[1])
+	}
+}
+
+// Rows whose names start like an explanation key are still rows.
+func TestRowNamedLikeAnExplanationLine(t *testing.T) {
+	reply := "@SESSION 7KQX2M\nLost-and-found files|med|no|0|1\nWhat-if scenarios|low|no|0|2" +
+		"\nSteps recordings|high|no|0|3\n@END 7KQX2M"
+	result := Parse(reply, batchOne)
+	if !result.Valid() || len(result.Categories) != 3 ||
+		result.Categories[0].Name != "Lost-and-found files" {
+		t.Fatalf("result = %+v", result)
+	}
+}
+
+func TestExplanationProblems(t *testing.T) {
+	long := strings.Repeat("word ", 45)
+	cases := []struct {
+		name  string
+		reply string
+		text  string
+	}{
+		{"missing", "A|high|yes|1|1\nwhat: x", "no lost:, step: line below it"},
+		{"none", "A|high|yes|1|1\nB|high|no|0|2", "no what:, lost:, step:"},
+		{"twice", "A|high|yes|1|1\nwhat: x\nwhat: y\nlost: z\nstep: s",
+			"more than one what:"},
+		{"too long", "A|high|yes|1|1\nwhat: " + long + "\nlost: z\nstep: s",
+			"longer than 40 words"},
+		{"empty", "A|high|yes|1|1\nwhat:\nlost: z\nstep: s", "what: is empty"},
+		{"too many steps", "A|high|yes|1|1\nwhat: x\nlost: z" +
+			strings.Repeat("\nstep: s", 6), "more than 5 step:"},
+	}
+	for _, testCase := range cases {
+		result := Parse("@SESSION 7KQX2M\n"+testCase.reply+"\n@END 7KQX2M", batchOne)
+		found := false
+		for _, problem := range result.Problems {
+			found = found || (problem.Check == CheckExplained &&
+				strings.Contains(problem.Message, testCase.text))
+		}
+		if result.Valid() || !found {
+			t.Errorf("%s: problems = %+v", testCase.name, result.Problems)
+		}
+	}
+	// Lines before the first row, and lines of a rejected row, are reported once.
+	before := Parse("@SESSION 7KQX2M\nwhat: x\nA|high|yes|1|1"+explanation+"\n@END 7KQX2M",
+		batchOne)
+	if before.Valid() || !before.Failed(CheckFormat) {
+		t.Fatalf("explanation before any row: %+v", before.Problems)
+	}
+	rejected := Parse("@SESSION 7KQX2M\nA|sure|yes|1|1"+explanation+"\n@END 7KQX2M", batchOne)
+	if len(rejected.Problems) != 1 || !rejected.Failed(CheckFormat) {
+		t.Fatalf("rejected row: %+v", rejected.Problems)
 	}
 }

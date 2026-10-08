@@ -17,8 +17,7 @@ flowchart LR
     C --> D[4 Export prompt]
     D -- you copy --> AI[(Any chat assistant)]
     AI -- you paste --> E[5 Paste response]
-    E --> F[6 Results]
-    F --> G[7 Delete]
+    E --> F[6 Delete]
 ```
 
 1. **Scan** drives or folders. Sizes are what files really occupy on disk (compression,
@@ -33,10 +32,14 @@ flowchart LR
 5. **Paste** the reply. Ullage validates it strictly: the reply can only name IDs from
    the prompt and choose from fixed values. Anything else is rejected, with a repair
    prompt to send back.
-6. **Results**: recipe and AI categories, largest first, with real names shown again
-   locally. Ask for explanations of AI categories; they go out as a short second prompt.
-7. **Delete**: every item is checked against the disk again right before deletion.
-   Recycle Bin by default; permanent deletion needs you to type a confirmation.
+   The reply explains every category it suggests deleting: what it is, what is lost and
+   how to free the space safely.
+6. **Delete**: recipe and AI categories, largest first, each with its explanation and
+   with real names shown again locally. Select what to delete; every item is checked
+   against the disk again right before deletion. Recycle Bin by default; permanent
+   deletion needs you to type a confirmation. Where a tool's own cleanup is the better
+   way (for example `rustup` for Rust toolchains), it is shown first, and deleting
+   directly carries a ⚠ warning about what it may break.
 
 ## Safety and privacy
 

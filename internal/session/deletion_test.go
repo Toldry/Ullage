@@ -11,23 +11,11 @@ import (
 	"github.com/toldry/ullage/internal/deletion"
 )
 
-// explainedFixture imports round A, then explains and opens categories 1 (low confidence)
-// and 3, so both are selectable.
+// explainedFixture imports the reply and opens category 1 (low confidence), so both
+// deletable categories, 1 and 3, are selectable.
 func explainedFixture(t *testing.T) (*Manager, map[string]string, string) {
 	t.Helper()
-	manager, view, lines := roundAFixture(t)
-	for _, number := range []int{1, 3} {
-		if _, err := manager.RequestExplanation(ExplanationRequest{Number: number,
-			Queued: true}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	reply := "@SESSION " + view.Code + "\n#1\nwhat: a\nlost: b\nstep: c\n#3\nwhat: a\n" +
-		"lost: b\nstep: c\n@END " + view.Code
-	if pasted, err := manager.Paste(PasteRequest{Batch: 2, Text: reply}); err != nil ||
-		!pasted.Imported {
-		t.Fatalf("round B import failed: %+v %v", pasted, err)
-	}
+	manager, _, lines := importedFixture(t)
 	if _, err := manager.MarkExpanded("ai:1"); err != nil {
 		t.Fatal(err)
 	}
@@ -78,11 +66,11 @@ func waitForDeletion(t *testing.T, manager *Manager) DeletionRun {
 // Safety rule 3: only items of the current results, in categories that may be deleted,
 // are accepted; everything else is refused by name rather than dropped.
 func TestDeletionRefusesKeysOutsideTheResults(t *testing.T) {
-	manager, _, lines := roundAFixture(t)
+	manager, _, lines := importedFixture(t)
 	keys := []string{
 		"ai:99|id:1",                  // no such category
 		"ai:3|id:9999",                // no such item
-		"ai:3|id:" + lines["photos"],  // no explanation yet (D-050)
+		"ai:1|id:" + lines["notes"],   // low confidence, not opened yet
 		"ai:2|id:" + lines["clients"], // the AI suggests keeping it
 		"recipe:npm-cache|node:1",     // no such recipe category in this scan
 		"ai:3|id:" + lines["notes"],   // an item of another category

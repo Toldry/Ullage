@@ -1,5 +1,5 @@
 id = "visual-studio-package-cache"
-version = 1
+version = 2
 name = "Visual Studio and installer package cache"
 what = """\
   Installer payloads kept so Visual Studio and other MSI-based products can repair, modify or \
@@ -18,5 +18,8 @@ text = """\
   after the installation."""
 
 [brute_force]
-allowed = false
-reason = "Installers need these files to repair, modify or uninstall products."
+allowed = true
+warning = """\
+  Visual Studio and other programs installed from these packages may fail to repair, modify, \
+  update or uninstall until they download the packages again or you provide the original \
+  installer. Programs that are no longer installed are not affected."""

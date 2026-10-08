@@ -1,5 +1,5 @@
 id = "wsl-distro-disk"
-version = 1
+version = 2
 priority = 20
 name = "WSL distro disk image"
 what = """\
@@ -32,7 +32,8 @@ text = "To remove a distribution you no longer need entirely."
 command = "wsl --unregister <distro>"
 
 [brute_force]
-allowed = false
-reason = """\
-  Deleting the disk image leaves a broken registration; use wsl --unregister to remove a \
-  distro."""
+allowed = true
+warning = """\
+  Destroys the distribution and every file inside it. If it is still registered, WSL keeps \
+  listing it and fails to start it; run wsl --unregister <distro> afterwards to clean up. Run \
+  wsl --shutdown first, or the file is in use."""

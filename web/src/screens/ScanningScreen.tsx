@@ -27,7 +27,7 @@ export function ScanningScreen({ progress, log, onPause, onResume, onCancel }: P
     <div class="screen">
       <div class="screen-header">
         <div class="heading">
-          <div class="step-label">Step 1 of 7</div>
+          <div class="step-label">Step 1 of 6</div>
           <h1>Scanning {title}</h1>
           <p class="lead">
             Reading metadata only, at low I/O priority. You can keep working while it runs.

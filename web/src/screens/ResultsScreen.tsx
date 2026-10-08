@@ -14,7 +14,7 @@ interface Props {
   onSelectionChange: (selection: Set<string>) => void;
   // Called with every new result list, so the owner can drop selections that went away.
   onResultsLoaded: (categories: ResultCategory[]) => void;
-  onGoExport: (round: number) => void;
+  onGoPaste: () => void;
   onRescan: () => void;
   onReviewDeletion: () => void;
   // Changes after a deletion, so the list is loaded again.
@@ -26,7 +26,7 @@ type ConfidenceFilter = 'any' | 'recipe' | 'high' | 'med' | 'low';
 type RegenerableFilter = 'any' | 'yes' | 'partially' | 'no';
 
 export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLoaded,
-  onGoExport, onRescan, onReviewDeletion, refreshToken }: Props) {
+  onGoPaste, onRescan, onReviewDeletion, refreshToken }: Props) {
   const [view, setView] = useState<ResultsView | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [focused, setFocused] = useState(0);
@@ -68,12 +68,6 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
     if (category.selectable) onSelectionChange(toggleCategory(category, selection));
   }, [selection, onSelectionChange]);
 
-  const requestExplanation = useCallback(async (category: ResultCategory, queued: boolean) => {
-    if (category.number) {
-      accept(await guard(resultsApi.requestExplanation(category.number, queued)));
-    }
-  }, [guard, accept]);
-
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
@@ -86,8 +80,6 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
       else if (event.key === 'x') toggleSelected(current);
       else if ((event.key === 'd' || event.key === 'D') && selection.size > 0) {
         onReviewDeletion();
-      } else if ((event.key === 'e' || event.key === 'E') && view && view.queuedCount > 0) {
-        onGoExport(view.explanationRound);
       } else return;
       event.preventDefault();
     };
@@ -110,14 +102,15 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
     <div class="screen screen-wide">
       <div class="screen-header">
         <div class="heading">
-          <div class="step-label">Step 6 of 7</div>
-          <h1>Results</h1>
+          <div class="step-label">Step 6 of 6</div>
+          <h1>Delete</h1>
           <p class="lead">
             {view.batchCount
               ? `${view.batchesImported} of ${view.batchCount} ` +
                 `${view.batchCount === 1 ? 'batch' : 'batches'} parsed. `
               : 'No AI replies imported yet; showing what the recipes found. '}
-            Sorted by reclaimable size. Nothing is deleted until you confirm in step 7.
+            Read what each category is, select what to delete, then review. Nothing is
+            deleted until you confirm.
           </p>
         </div>
         {view.categories.length > 0 && (
@@ -130,19 +123,14 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
         )}
       </div>
 
-      {view.queuedCount > 0 && (
+      {view.batchCount > view.batchesImported && (
         <div class="queued-note">
           <span class="grow">
-            <span class="mono strong">{view.queuedCount}</span>{' '}
-            {view.queuedCount === 1 ? 'explanation' : 'explanations'} queued for round{' '}
-            {view.explanationRound}. Copy the prompt into the same conversation as the
-            batches, then paste the reply in step 5.
+            {view.batchCount - view.batchesImported} of {view.batchCount}{' '}
+            {view.batchCount === 1 ? 'batch has' : 'batches have'} no imported reply yet;
+            their items are not listed here.
           </span>
-          <button type="button" class="button button-primary button-with-key"
-            onClick={() => onGoExport(view.explanationRound)}>
-            Export explanation prompt
-            <Kbd inverse>E</Kbd>
-          </button>
+          <button type="button" class="button" onClick={onGoPaste}>Paste a reply</button>
         </div>
       )}
 
@@ -206,7 +194,6 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
           {allRows.map((category, index) => (
             <CategoryRow key={category.key} category={category} largest={largest}
               kept={index >= rows.length}
-              round={view.explanationRound}
               focused={index === Math.min(focused, allRows.length - 1)}
               expanded={expanded.has(category.key)}
               selection={selection}
@@ -218,9 +205,7 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
                 if (next.has(key)) next.delete(key);
                 else next.add(key);
                 onSelectionChange(next);
-              }}
-              onRequestExplanation={(queued) => void requestExplanation(category, queued)}
-              onGoExport={() => onGoExport(view.explanationRound)} />
+              }} />
           ))}
         </div>
       )}
@@ -236,7 +221,7 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
             {formatBytes(keptBytes)} in {pluralize(view.kept.length, 'category',
               'categories')} the AI suggests keeping
           </button>
-        </>}. Keys: j / k move, Enter expand, x select, E export explanations, D review deletion.
+        </>}. Keys: j / k move, Enter expand, x select, D review deletion.
       </div>
     </div>
   );
@@ -290,7 +275,6 @@ function CategoryRow(props: {
   category: ResultCategory;
   largest: number;
   kept: boolean;
-  round: number;
   focused: boolean;
   expanded: boolean;
   selection: Selection;
@@ -298,21 +282,20 @@ function CategoryRow(props: {
   onToggleExpand: () => void;
   onToggleSelected: () => void;
   onToggleItem: (key: string) => void;
-  onRequestExplanation: (queued: boolean) => void;
-  onGoExport: () => void;
 }) {
   const { category } = props;
   const state = selectionState(category, props.selection);
   const single = category.itemCount === 1 ? category.items[0] : undefined;
   const checkboxTitle = props.kept ? 'The AI suggests keeping these'
     : !category.bruteForce.allowed ? 'Managed cleanup only'
-      : category.needsExplanation ? 'Request an explanation first'
+      : category.needsExplanation ? 'The AI reply did not explain this category'
         : category.needsExpand ? 'Expand the row to enable delete' : 'Select for deletion';
   return (
     <>
       <div role="row" tabIndex={-1}
         class={`results-row${props.focused ? ' focused' : ''}${props.expanded ? ' open' : ''}` +
-          `${props.kept ? ' kept' : ''}`}
+          `${props.kept ? ' kept' : ''}` +
+          `${category.explanation && !props.expanded ? ' has-explanation' : ''}`}
         onClick={() => { props.onFocus(); props.onToggleExpand(); }}>
         <span title={checkboxTitle}>
           <Checkbox state={state} label={`Select ${category.name}`}
@@ -331,6 +314,11 @@ function CategoryRow(props: {
           {category.cloudSyncItems > 0 && (
             <span class="cloud-badge" title="Deleting also deletes the cloud copy">
               cloud-synced
+            </span>
+          )}
+          {category.bruteForce.warning && (
+            <span class="warning-badge" title={category.bruteForce.warning}>
+              ⚠ managed cleanup preferred
             </span>
           )}
         </span>
@@ -362,31 +350,26 @@ function CategoryRow(props: {
           <RowAction {...props} />
         </span>
       </div>
+      {category.explanation && !props.expanded && (
+        <div class={`results-explanation small${props.focused ? ' focused' : ''}`}
+          onClick={() => {
+          props.onFocus();
+          props.onToggleExpand();
+        }}>
+          <span class="muted">{category.explanation.what}</span>{' '}
+          <span><span class="faint">Lost if deleted:</span> {category.explanation.lost}</span>
+        </div>
+      )}
       {props.expanded && <CategoryDetail {...props} />}
     </>
   );
 }
 
-function RowAction(props: {
-  category: ResultCategory;
-  kept: boolean;
-  round: number;
-  onRequestExplanation: (queued: boolean) => void;
-}) {
+function RowAction(props: { category: ResultCategory; kept: boolean }) {
   const { category } = props;
   if (props.kept) return <span class="faint">AI suggests keeping</span>;
   if (!category.bruteForce.allowed) return <span class="faint">Managed cleanup only</span>;
-  if (category.explanationState === 'queued') {
-    return <span class="cell-mono muted">queued · round {props.round}</span>;
-  }
-  if (category.explanationState === 'none') {
-    return (
-      <button type="button" class="button button-small"
-        onClick={(event) => { event.stopPropagation(); props.onRequestExplanation(true); }}>
-        Request explanation
-      </button>
-    );
-  }
+  if (category.needsExplanation) return <span class="faint">Not explained</span>;
   if (category.needsExpand) return <span class="faint">Expand to enable delete</span>;
   return null;
 }
@@ -397,21 +380,16 @@ function provenance(category: ResultCategory): string {
   }
   const confidence = { high: 'high confidence', med: 'medium confidence',
     low: 'low confidence', recipe: '' }[category.confidence];
-  const explained = category.explanation?.round
-    ? ` · explained in round ${category.explanation.round}` : '';
   const received = category.importedAt ? ` · received ${formatClock(category.importedAt)}` : '';
-  return `AI · batch ${category.batch} · ${confidence}${received}${explained}`;
+  return `AI · batch ${category.batch} · ${confidence}${received}`;
 }
 
 function CategoryDetail(props: {
   category: ResultCategory;
   kept: boolean;
-  round: number;
   selection: Selection;
   onToggleSelected: () => void;
   onToggleItem: (key: string) => void;
-  onRequestExplanation: (queued: boolean) => void;
-  onGoExport: () => void;
 }) {
   const { category } = props;
   const explanation = category.explanation;
@@ -427,28 +405,11 @@ function CategoryDetail(props: {
           </>
         ) : (
           <div class="explain-box">
-            <div class="strong">No explanation yet</div>
+            <div class="strong">No explanation</div>
             <div class="small muted">
-              {category.explanationState === 'queued'
-                ? `Queued for export round ${props.round}. Nothing is sent until you copy ` +
-                  'that prompt.'
-                : `The AI grouped these as “${category.name}” but did not describe them. ` +
-                  'Requesting adds this category to the next export round; nothing is sent ' +
-                  'until you copy that prompt.'}
-            </div>
-            <div class="actions">
-              {category.explanationState === 'queued' && (
-                <button type="button" class="button button-primary button-small"
-                  onClick={props.onGoExport}>
-                  Export explanation prompt
-                </button>
-              )}
-              <button type="button" class="button button-small"
-                onClick={() => props.onRequestExplanation(
-                  category.explanationState !== 'queued')}>
-                {category.explanationState === 'queued' ? 'Remove from queue'
-                  : 'Request explanation'}
-              </button>
+              The AI grouped these as “{category.name}” but its reply did not describe them,
+              so they can't be selected. Paste a corrected reply for batch {category.batch}
+              in step 5 to explain them.
             </div>
           </div>
         )}
@@ -463,7 +424,7 @@ function CategoryDetail(props: {
             <span class="muted">
               Delete stays off until a row like this has been opened.{' '}
               {category.needsExplanation
-                ? 'It also needs the explanation; request it first.'
+                ? 'It also needs an explanation from the AI.'
                 : 'It is enabled now; check the items on the right first.'}
             </span>
           </div>
@@ -494,8 +455,7 @@ function CategoryDetail(props: {
         )}
         {!props.kept && category.needsExplanation ? (
           <div class="small faint">
-            Cleanup methods arrive with the explanation. Until then these items can't be
-            selected.
+            Without an explanation these items can't be selected.
           </div>
         ) : props.kept ? (
           <div class="cleanup-box dashed">
@@ -516,6 +476,12 @@ function CategoryDetail(props: {
             <div class="small muted">
               Move the selected items to the Recycle Bin. Nothing outside them is touched.
             </div>
+            {category.bruteForce.warning && (
+              <div class="brute-warning small" role="note">
+                <span class="warn-text strong">⚠ Prefer the managed steps if you can.</span>{' '}
+                {category.bruteForce.warning}
+              </div>
+            )}
             <div>
               <button type="button" class="button button-small"
                 disabled={!category.selectable} onClick={props.onToggleSelected}>

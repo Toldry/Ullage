@@ -293,7 +293,7 @@ export function RedactScreen({ guard, onOpenRules, onContinue }: Props) {
 function Heading() {
   return (
     <div class="heading">
-      <div class="step-label">Step 3 of 7</div>
+      <div class="step-label">Step 3 of 6</div>
       <h1>Redaction review</h1>
       <p class="lead">
         These Unknown items will be described to the AI by path, size, file count, dates and

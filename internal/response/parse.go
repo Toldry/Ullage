@@ -36,6 +36,10 @@ type Category struct {
 	Deletable   bool        `json:"deletable"`
 	IDs         []int       `json:"ids"`
 	Line        int         `json:"line"`
+	// The explanation written below the row; required when Deletable.
+	What  string   `json:"what,omitempty"`
+	Lost  string   `json:"lost,omitempty"`
+	Steps []string `json:"steps,omitempty"`
 }
 
 // Problem is one validation error, phrased so it can go straight into a repair prompt.
@@ -55,11 +59,12 @@ const (
 	CheckFormat      Check = "format"
 	CheckItemIDs     Check = "ids"
 	CheckDuplicates  Check = "duplicates"
+	CheckExplained   Check = "explained"
 )
 
 // AllChecks is the order the checklist shows.
 var AllChecks = []Check{CheckSessionCode, CheckComplete, CheckFormat, CheckItemIDs,
-	CheckDuplicates}
+	CheckDuplicates, CheckExplained}
 
 // Expectation describes the batch a reply must answer.
 type Expectation struct {
@@ -186,15 +191,56 @@ func (result *Result) checkCodes(lines []string, start, end int, expectation Exp
 	}
 }
 
+// parseRows reads category rows and the explanation lines below each. Explanation lines
+// are recognized by their prefix first, because their text may contain '|'.
 func (result *Result) parseRows(lines []string, from, to int, expectation Expectation) {
+	// current is the row the next explanation lines belong to; nil before the first row.
+	// A rejected row still owns its lines, so they do not add problems of their own.
+	var current *Category
+	rejected := false
 	for index := from; index < to; index++ {
 		line := cleanRow(lines[index])
 		if line == "" || headerRow.MatchString(line) || tableRule.MatchString(line) {
 			continue
 		}
+		if item, problem, ok := parseField(line); ok {
+			switch {
+			case current == nil && !rejected:
+				result.add(Problem{Line: index + 1, Subject: shorten(line), Check: CheckFormat,
+					Message: "this explanation line comes before the first category row"})
+			case current != nil:
+				if problem == "" {
+					problem = current.addField(item)
+				} else {
+					problem = item.name + ": " + problem
+				}
+				if problem != "" {
+					result.add(Problem{Line: index + 1, Subject: shorten(current.Name),
+						Check: CheckExplained, Message: problem})
+				}
+			}
+			continue
+		}
+		result.flushExplanation(current)
+		current, rejected = nil, false
 		if category, ok := result.parseRow(line, index+1, expectation); ok {
 			result.Categories = append(result.Categories, category)
+			current = &result.Categories[len(result.Categories)-1]
+		} else {
+			rejected = true
 		}
+	}
+	result.flushExplanation(current)
+}
+
+// flushExplanation checks the explanation of the row just finished.
+func (result *Result) flushExplanation(category *Category) {
+	if category == nil {
+		return
+	}
+	if problem := category.explanationProblem(); problem != "" {
+		result.add(Problem{Line: category.Line, Subject: shorten(category.Name),
+			Check: CheckExplained, Message: problem})
 	}
 }
 

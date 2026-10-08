@@ -68,6 +68,7 @@ func newFixture(t *testing.T) fixture {
 	byClaim := []*recipes.Recipe{recipe("npm-cache", true), recipe("nuget", true),
 		recipe("docker", false), recipe("apps", false), recipe("tiny", true)}
 	byClaim[3].Dynamic = recipes.DynamicInstalledApplications
+	byClaim[1].BruteForce.Warning = "The tool loses track of deleted packages."
 	result := fileSystem.Scan(t, "/c", classifier)
 
 	redactor := redact.New(redact.Options{Tree: result.Tree,
@@ -82,8 +83,7 @@ func newFixture(t *testing.T) fixture {
 		RecipeForClaim: func(claimID int32) *recipes.Recipe {
 			return byClaim[claimID]
 		},
-		Redactor: redactor, Export: &export, Explanations: map[int]ReceivedExplanation{},
-		Queued: map[int]bool{}, Expanded: map[string]bool{},
+		Redactor: redactor, Export: &export, Expanded: map[string]bool{},
 		MinimumBytes: prompt.DefaultOptions.MinimumItemBytes,
 		Profile:      filepath.FromSlash("/c/Users/mara")}}
 }
@@ -168,7 +168,8 @@ func TestMergeAndSortByReclaimableSize(t *testing.T) {
 	}
 	nuget := byKey(model, "recipe:nuget")
 	if nuget.Bytes != 310*megabyte || nuget.ItemCount != 3 ||
-		nuget.Items[0].Bytes != 150*megabyte || nuget.RecipeVersion != 2 {
+		nuget.Items[0].Bytes != 150*megabyte || nuget.RecipeVersion != 2 ||
+		!nuget.Selectable || nuget.BruteForce.Warning == "" {
 		t.Errorf("nuget = %+v", nuget)
 	}
 	// Installed applications and categories under the threshold are not listed.
@@ -205,10 +206,9 @@ func TestRealNamesRestoredForDisplayOnly(t *testing.T) {
 	if !strings.HasPrefix(placeholder, "<R") {
 		t.Fatalf("kestrel not redacted: %q", placeholder)
 	}
-	fixture.input.Explanations[1] = ReceivedExplanation{Round: 2,
-		Explanation: response.Explanation{Number: 1, What: "CMake output for " +
-			placeholder + ".", Lost: "Nothing in " + placeholder + "/src.",
-			Steps: []string{"Rebuild " + placeholder + " later."}}}
+	row := &fixture.input.Imported[0].Category
+	row.What, row.Lost = "CMake output for "+placeholder+".", "Nothing in "+placeholder+"/src."
+	row.Steps = []string{"Rebuild " + placeholder + " later."}
 	model := Build(fixture.input)
 
 	category := byKey(model, "ai:1")
@@ -235,11 +235,11 @@ func TestRealNamesRestoredForDisplayOnly(t *testing.T) {
 	}
 }
 
+// explain gives imported rows the explanation lines a reply carries below them.
 func explain(fixture *fixture, numbers ...int) {
 	for _, number := range numbers {
-		fixture.input.Explanations[number] = ReceivedExplanation{Round: 2,
-			Explanation: response.Explanation{Number: number, What: "w", Lost: "l",
-				Steps: []string{"s"}}}
+		row := &fixture.input.Imported[number-1].Category
+		row.What, row.Lost, row.Steps = "w", "l", []string{"s"}
 	}
 }
 
@@ -261,12 +261,12 @@ func TestLowConfidenceNeedsExpandBeforeDelete(t *testing.T) {
 	}
 }
 
-// Decision D-050: nothing the AI judged is selectable before its explanation arrives.
+// Decision D-050: nothing the AI judged is selectable without an explanation. The parser
+// already rejects such rows; this is the second line of defense.
 func TestAICategoriesNeedAnExplanationBeforeDelete(t *testing.T) {
 	fixture := newFixture(t)
 	fixture.importRows(t)
 	fixture.input.Expanded["ai:3"] = true
-	fixture.input.Queued[1] = true
 	model := Build(fixture.input)
 	for _, key := range []string{"ai:1", "ai:3"} {
 		if category := byKey(model, key); !category.NeedsExplanation || category.Selectable {
@@ -283,12 +283,12 @@ func TestAICategoriesNeedAnExplanationBeforeDelete(t *testing.T) {
 	}
 }
 
-func TestQueuedState(t *testing.T) {
+func TestExplanationStates(t *testing.T) {
 	fixture := newFixture(t)
 	fixture.importRows(t)
-	fixture.input.Queued[3] = true
+	explain(&fixture, 3)
 	model := Build(fixture.input)
-	if byKey(model, "ai:3").ExplanationState != ExplanationQueued ||
+	if byKey(model, "ai:3").ExplanationState != ExplanationReceived ||
 		byKey(model, "ai:1").ExplanationState != ExplanationNone ||
 		byKey(model, "recipe:nuget").ExplanationState != ExplanationRecipe {
 		t.Fatalf("states wrong: %+v", model.Categories)

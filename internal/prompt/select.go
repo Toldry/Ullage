@@ -48,7 +48,9 @@ type Options struct {
 	MinimumItemBytes int64
 	// MaximumItems bounds how far large folders are split into finer items.
 	MaximumItems int
-	// BatchLines is the data-line budget per batch.
+	// BatchLines is the data-line budget per batch. Replies carry an explanation under
+	// every deletable category, so a smaller batch keeps each reply short enough that
+	// chat assistants do not cut it off (decision D-069).
 	BatchLines int
 	// CollapseMinimum is how many same-named folders become one "xN" line.
 	CollapseMinimum int
@@ -61,7 +63,7 @@ type Options struct {
 var DefaultOptions = Options{
 	MinimumItemBytes:   100 << 20,
 	MaximumItems:       900,
-	BatchLines:         300,
+	BatchLines:         150,
 	CollapseMinimum:    3,
 	ManyFilesThreshold: 20,
 }

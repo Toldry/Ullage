@@ -203,7 +203,7 @@ Strictly these are GiB; switching to decimal units is a one-line change.
 
 ## Prompts and replies (Phase 3)
 
-### D-035: How the Unknown tier becomes lines — Reported (Phase 3)
+### D-035: How the Unknown tier becomes lines — Reported (Phase 3); batch size changed by D-069
 1. Forced splits: a folder that also holds Known or System bytes is split until every
    item is purely Unknown, so an ID can never cover recipe or System data.
 2. Budgeted refinement: the largest remaining folder is replaced by its children of at
@@ -271,14 +271,14 @@ runs and symbols; expect ±30%. A typical mixed PC (320 GB Unknown) produced 108
   recipes keep, Unknown kept by the AI and Unknown not classified, so an empty result
   still explains where the space is.
 
-### D-044: Numbering and rounds for round B — Reported (Phase 4)
+### D-044: Numbering and rounds for round B — Superseded by D-066
 Every imported category gets a number unique within the export, assigned at import.
 Round B refers to categories only by these numbers. Importing a batch again gives its
 categories new numbers and drops their explanations, queue entries and unlocks. The
 round B prompt uses the export's session code and is the step after the batches (round
 4 after three batches, round 5 after the next explanation round), as in the design.
 
-### D-045: What the round B parser tolerates — Reported (Phase 4)
+### D-045: What the round B parser tolerates — Superseded by D-066
 Same extraction as round A (prose, fences, quotes, last block). Accepted: bullets, bold
 markers, `### #2` headings, `Step 1:` and upper-case keys. Required per category:
 exactly one `what:`, one `lost:` and 1 to 5 `step:` lines. The prompt asks for under 25
@@ -298,8 +298,7 @@ button. See design conflict 15.
 Placeholders in category names and explanations are replaced locally using only the
 placeholders of items in the current export and their folders, rendered by the same
 redactor the prompt was built with. A placeholder the export never used stays as it is.
-The round B prompt always uses the assistant's original text, never the restored one;
-a test asserts that no redacted name reaches it.
+Restored text is only displayed; nothing restored is ever sent back to the assistant.
 
 ### D-048: The low-confidence unlock is recorded by the server — Reported (Phase 4)
 Opening a low-confidence row posts `/api/results/expand`; the server records it and only
@@ -312,7 +311,7 @@ The selection is kept in the page and pruned when results change; "Review deleti
 disabled until step 7 exists. Phase 5 will send the selected keys and re-resolve every
 one on the server.
 
-### D-050: AI categories need an explanation before delete — Approved (Phase 4 review)
+### D-050: AI categories need an explanation before delete — Approved (Phase 4), revised by D-066
 The design says "Cleanup methods arrive with the explanation. Until then these items
 can't be selected." The spec only gates low confidence; on review the stricter design
 rule was adopted. An AI category can be selected only after its round B explanation has
@@ -446,7 +445,7 @@ unreadable. Both fail when rendering is bypassed.
 ### D-064: End-to-end test level — Reported (Phase 6)
 The required "end-to-end on Windows CI" test drives a real server over loopback the way
 the browser does (launch link, cookie, token header, Origin): scan a temporary folder,
-export, import replies for both rounds, verify, recycle with the real Recycle Bin, and
+export, import a reply with its explanations, verify, recycle with the real Recycle Bin, and
 read the history. Browser-level runs (headless Chromium) are done during development;
 they are not part of CI, to keep it free of browser downloads.
 
@@ -464,3 +463,51 @@ from the build graph (`scripts/notices.sh`): the Go standard library, every link
 module, the npm runtime dependencies bundled into the UI, and the IBM Plex fonts (OFL).
 The executables are not Authenticode-signed (no certificate), so SmartScreen may warn
 on first run. A manual run rehearses everything without publishing.
+
+## Explanations in the reply, one Delete step
+
+### D-066: Explanations are part of every reply — Approved (owner request)
+Explanations are no longer requested per category in a separate round B. The batch
+prompt asks for them directly: below each category row, a `what:`, a `lost:` and 1 to 5
+`step:` lines. They are required for a row with `del 1` and optional for `del 0`. The
+parser finds them by their prefix before treating a line as a row, so their text may
+contain `|`. A deletable row without them, a second `what:` or `lost:`, more than five
+steps, an explanation line before the first row, or a line over 40 words or 320
+characters is a problem under the new "Explanations" check, and the reply goes back
+with a repair prompt like any other problem. The word target (25) and step limit (5)
+are stated in the prompt; a test keeps them equal to what the parser enforces. D-050
+still holds: an AI category without an explanation cannot be selected; since the parser
+rejects such rows, that lock is now a second line of defense. Round B, its queue, its
+prompt, its parser, `/api/results/explain` and the request-explanation buttons are
+removed.
+
+### D-067: Results and Delete are one step — Approved (owner request)
+The flow is six steps: Scan, Overview, Redaction, Export prompt, Paste response, Delete.
+Step 6 opens on the category list (formerly step 6, Results): each row shows the
+explanation's "what" and "lost if deleted" directly under it, and the detail still
+shows the cleanup steps and items. "Review deletion" switches the same page to the
+verification, confirmation and progress view (formerly step 7); "Back to the list" and
+finishing return to the list. Number key 6 opens the step; 7 does nothing.
+
+### D-068: Brute force with a warning — Approved (owner request)
+Some recipes were managed-only because the owning tool is the better way to clean up,
+not because deleting is unsafe. That left nothing to do when the tool was already gone
+(an uninstalled rustup leaves its toolchains behind). Such recipes now allow brute force
+and carry a `brute_force.warning` that says what can break. The warning is shown as a
+badge on the row, in the brute-force box, on each confirmation row and once per
+category above the delete options. Recipe validation rejects a warning on a recipe that
+does not allow brute force. Changed (version bumped): Rust toolchains, Docker Desktop
+disk image, WSL distro disks, Ollama models, Visual Studio package cache, iPhone and
+iPad backups, Explorer thumbnail cache. Still managed-only: everything under the Windows
+folder (delivery optimization, system temp, Windows Update downloads, component store,
+previous Windows), the hibernation and page files, restore points, the Recycle Bin and
+installed applications. The deletion guard is unchanged: protected trees and System
+tier stay blocked whatever a recipe says.
+
+### D-069: Smaller batches — Reported
+Replies now carry about four lines per deletable category instead of one, so the
+default data-line budget per batch drops from 300 to 150. Long replies are where chat
+assistants truncate output, and a truncated reply costs a repair round; more batches
+cost one more copy and paste each. The item budget (900) and minimum size (100 MiB) are
+unchanged; `promptBatchLines` in `config.json` still overrides the default.
+

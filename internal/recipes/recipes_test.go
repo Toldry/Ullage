@@ -24,8 +24,13 @@ func TestBuiltInRecipesLoadAndCoverTheRequiredList(t *testing.T) {
 	if len(library.System.Paths["windows"]) == 0 {
 		t.Errorf("no System-tier rules for windows")
 	}
-	if library.ByID("docker-desktop-wsl").BruteForce.Allowed {
-		t.Errorf("Docker Desktop disk image must be managed-only")
+	// Recipes whose managed steps are the better way allow deleting only with a warning
+	// that says what breaks (decision D-068).
+	for _, id := range []string{"docker-desktop-wsl", "wsl-distro-disk", "rustup-toolchains",
+		"ollama-models", "visual-studio-package-cache", "phone-backups", "thumbnail-cache"} {
+		if policy := library.ByID(id).BruteForce; !policy.Allowed || policy.Warning == "" {
+			t.Errorf("%s: brute force = %+v, want allowed with a warning", id, policy)
+		}
 	}
 	for position := 1; position < len(library.Recipes); position++ {
 		if library.Recipes[position-1].Priority > library.Recipes[position].Priority {
@@ -63,9 +68,11 @@ func TestValidationAcceptsAMinimalRecipe(t *testing.T) {
 
 func TestValidationRejectsBadRecipes(t *testing.T) {
 	cases := map[string]string{
-		"bad enum":           strings.Replace(validRecipe, `"yes"`, `"maybe"`, 1),
-		"unknown key":        validRecipe + "\ncolour = \"red\"\n",
-		"no reason":          strings.Replace(validRecipe, "allowed = true", "allowed = false", 1),
+		"bad enum":    strings.Replace(validRecipe, `"yes"`, `"maybe"`, 1),
+		"unknown key": validRecipe + "\ncolour = \"red\"\n",
+		"no reason":   strings.Replace(validRecipe, "allowed = true", "allowed = false", 1),
+		"warning when managed-only": strings.Replace(validRecipe, "allowed = true",
+			"allowed = false\nreason = \"r\"\nwarning = \"w\"", 1),
 		"protected location": strings.Replace(validRecipe, "{UserProfile}/x", "{SystemRoot}/x", 1),
 		"bad id":             strings.Replace(validRecipe, `"example"`, `"Bad Id"`, 1),
 		"unknown platform":   strings.Replace(validRecipe, "windows =", "macos =", 1),

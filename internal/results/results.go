@@ -31,9 +31,9 @@ type ExplanationState string
 const (
 	// ExplanationRecipe: the recipe carries the explanation.
 	ExplanationRecipe ExplanationState = "recipe"
-	// ExplanationNone: an AI category nobody asked to explain yet.
-	ExplanationNone     ExplanationState = "none"
-	ExplanationQueued   ExplanationState = "queued"
+	// ExplanationNone: an AI category whose reply row carried no explanation lines.
+	ExplanationNone ExplanationState = "none"
+	// ExplanationReceived: the assistant explained it below its row.
 	ExplanationReceived ExplanationState = "received"
 )
 
@@ -52,18 +52,18 @@ type Step struct {
 
 // Explanation is what the user reads before deciding.
 type Explanation struct {
-	What       string    `json:"what"`
-	Lost       string    `json:"lost"`
-	Steps      []Step    `json:"steps"`
-	Note       string    `json:"note,omitempty"`
-	Round      int       `json:"round,omitempty"`
-	ReceivedAt time.Time `json:"receivedAt,omitempty"`
+	What  string `json:"what"`
+	Lost  string `json:"lost"`
+	Steps []Step `json:"steps"`
+	Note  string `json:"note,omitempty"`
 }
 
-// BruteForce says whether Ullage itself may move the items to the Recycle Bin.
+// BruteForce says whether Ullage itself may move the items to the Recycle Bin. Warning is
+// shown with an allowed brute-force deletion that the managed steps would do better.
 type BruteForce struct {
 	Allowed bool   `json:"allowed"`
 	Reason  string `json:"reason,omitempty"`
+	Warning string `json:"warning,omitempty"`
 }
 
 // Item is one thing a category covers, with its real local path.
@@ -116,8 +116,9 @@ type Category struct {
 	BruteForce       BruteForce       `json:"bruteForce"`
 	// NeedsExpand: a low-confidence category whose row the user has not opened yet.
 	NeedsExpand bool `json:"needsExpand"`
-	// NeedsExplanation: an AI category whose round B explanation has not arrived. The user
-	// reads what is lost before anything the AI judged can be selected (decision D-050).
+	// NeedsExplanation: an AI category without an explanation. The user reads what is lost
+	// before anything the AI judged can be selected (decision D-050). The parser rejects
+	// a del 1 row without one, so this is a second line of defense.
 	NeedsExplanation bool `json:"needsExplanation"`
 	// CloudSyncItems counts items that are or contain cloud-synced entries (see Item).
 	CloudSyncItems int   `json:"cloudSyncItems"`
@@ -142,19 +143,12 @@ type Model struct {
 	Summary Summary    `json:"summary"`
 }
 
-// ImportedCategory is one validated round A row with the number it was given on import.
+// ImportedCategory is one validated reply row with the number it was given on import.
 type ImportedCategory struct {
 	Number     int
 	Batch      int
 	ImportedAt time.Time
 	Category   response.Category
-}
-
-// ReceivedExplanation is a validated round B entry.
-type ReceivedExplanation struct {
-	Explanation response.Explanation
-	Round       int
-	ReceivedAt  time.Time
 }
 
 // Input is everything Build needs. Nothing in it is modified.
@@ -165,8 +159,6 @@ type Input struct {
 	Redactor       *redact.Redactor
 	Export         *prompt.Export
 	Imported       []ImportedCategory
-	Explanations   map[int]ReceivedExplanation
-	Queued         map[int]bool
 	Expanded       map[string]bool
 	// Deleted holds DeletedKey values of items deleted in this session; they are not
 	// listed again. Keys name scan nodes, so they stay valid when an export is rebuilt.
@@ -284,7 +276,7 @@ func newRecipeCategory(recipe *recipes.Recipe) *Category {
 			Note: recipe.ManagedNote},
 		ExplanationState: ExplanationRecipe,
 		BruteForce: BruteForce{Allowed: recipe.BruteForce.Allowed,
-			Reason: recipe.BruteForce.Reason},
+			Reason: recipe.BruteForce.Reason, Warning: recipe.BruteForce.Warning},
 		Selectable: recipe.BruteForce.Allowed}
 }
 
@@ -344,18 +336,14 @@ func buildAICategory(input Input, imported ImportedCategory, restorer *restorer)
 		category.Items = append(category.Items, withCloud(input.Tree, entry))
 	}
 	finishItems(&category)
-	if received, found := input.Explanations[imported.Number]; found {
-		explanation := received.Explanation
-		steps := make([]Step, len(explanation.Steps))
-		for index, step := range explanation.Steps {
+	if row.What != "" && row.Lost != "" {
+		steps := make([]Step, len(row.Steps))
+		for index, step := range row.Steps {
 			steps[index] = Step{Text: restorer.restore(step)}
 		}
-		category.Explanation = &Explanation{What: restorer.restore(explanation.What),
-			Lost: restorer.restore(explanation.Lost), Steps: steps, Round: received.Round,
-			ReceivedAt: received.ReceivedAt}
+		category.Explanation = &Explanation{What: restorer.restore(row.What),
+			Lost: restorer.restore(row.Lost), Steps: steps}
 		category.ExplanationState = ExplanationReceived
-	} else if input.Queued[imported.Number] {
-		category.ExplanationState = ExplanationQueued
 	}
 	category.NeedsExpand = row.Confidence == response.ConfidenceLow &&
 		!input.Expanded[category.Key]

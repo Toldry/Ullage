@@ -1,5 +1,5 @@
 id = "rustup-toolchains"
-version = 1
+version = 2
 name = "Rust toolchains"
 what = "Rust compilers and standard libraries installed by rustup, one folder per toolchain."
 lost = "Toolchains you remove must be installed again before projects that pin them can build."
@@ -18,5 +18,8 @@ text = "Remove the ones you no longer use."
 command = "rustup toolchain uninstall <toolchain>"
 
 [brute_force]
-allowed = false
-reason = "rustup tracks installed toolchains; deleting folders by hand leaves it inconsistent."
+allowed = true
+warning = """\
+  If rustup is still installed, it keeps listing the deleted toolchains as installed, and \
+  builds that pin one fail until you run rustup toolchain uninstall or install for it. If \
+  Rust is no longer installed, deleting the folders is safe."""

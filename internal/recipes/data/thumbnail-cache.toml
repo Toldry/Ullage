@@ -1,5 +1,5 @@
 id = "thumbnail-cache"
-version = 1
+version = 2
 name = "Explorer thumbnail and icon cache"
 what = "Small previews of pictures, videos and documents that File Explorer keeps."
 lost = "Nothing. Thumbnails are drawn again the next time a folder is opened."
@@ -14,5 +14,8 @@ text = "Run Disk Cleanup and select Thumbnails."
 command = "cleanmgr.exe"
 
 [brute_force]
-allowed = false
-reason = "File Explorer keeps these files open; Disk Cleanup removes them safely."
+allowed = true
+warning = """\
+  File Explorer keeps some of these files open, so they are skipped as in use; sign out and \
+  back in, or use Disk Cleanup, to remove the rest. Folders show blank previews briefly \
+  while thumbnails are drawn again."""

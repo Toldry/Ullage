@@ -34,7 +34,7 @@ export function OverviewScreen(
     <div class="screen screen-wide">
       <div class="screen-header">
         <div class="heading">
-          <div class="step-label">Step 2 of 7</div>
+          <div class="step-label">Step 2 of 6</div>
           <h1>Overview</h1>
           <p class="lead lead-mono">
             {rootNames} · scanned {formatDateTime(overview.scannedAt)} in{' '}

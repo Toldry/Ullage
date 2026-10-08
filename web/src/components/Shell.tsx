@@ -9,7 +9,6 @@ export type Screen =
   | 'redact'
   | 'export'
   | 'paste'
-  | 'results'
   | 'delete'
   | 'rules'
   | 'history';
@@ -20,8 +19,7 @@ export const steps: { screen: Screen; number: number; label: string }[] = [
   { screen: 'redact', number: 3, label: 'Redaction' },
   { screen: 'export', number: 4, label: 'Export prompt' },
   { screen: 'paste', number: 5, label: 'Paste response' },
-  { screen: 'results', number: 6, label: 'Results' },
-  { screen: 'delete', number: 7, label: 'Delete' },
+  { screen: 'delete', number: 6, label: 'Delete' },
 ];
 
 export function TopBar(props: {
@@ -147,7 +145,7 @@ export function StatusBar(props: {
       {props.files !== undefined && <span>{formatCount(props.files)} files indexed</span>}
       <span>{props.elevated ? 'elevated' : 'not elevated'}</span>
       <div class="spacer" />
-      <span>1–7 steps · R rules · H history · Esc cancel · T theme</span>
+      <span>1–6 steps · R rules · H history · Esc cancel · T theme</span>
     </footer>
   );
 }

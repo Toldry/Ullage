@@ -13,4 +13,5 @@ export const checkLabels = {
   format: 'Format and values',
   ids: 'Item IDs',
   duplicates: 'No duplicates',
+  explained: 'Explanations',
 } as const;

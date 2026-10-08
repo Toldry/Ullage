@@ -64,6 +64,8 @@ type DeletionItem struct {
 	NowBytes int64 `json:"nowBytes,omitempty"`
 	// CloudSync: deleting it also deletes the cloud copy (decision D-052).
 	CloudSync bool `json:"cloudSync,omitempty"`
+	// Warning is the recipe's brute-force warning, repeated where the user confirms.
+	Warning string `json:"warning,omitempty"`
 }
 
 // Tally counts items and bytes.
@@ -164,7 +166,8 @@ func (manager *Manager) resolveSelection(keys []string) ([]DeletionItem,
 			targets[full] = targetFor(full, category, item)
 			items = append(items, DeletionItem{Key: full, Category: category.Key,
 				CategoryName: category.Name, Path: item.Path, Kind: item.Kind,
-				Bytes: item.Bytes, CloudSync: item.CloudSync})
+				Bytes: item.Bytes, CloudSync: item.CloudSync,
+				Warning: category.BruteForce.Warning})
 		}
 	}
 	return items, targets, nil
@@ -185,9 +188,9 @@ func refusalReason(category results.Category) string {
 	case !category.BruteForce.Allowed:
 		return "the AI suggests keeping these"
 	case category.NeedsExplanation:
-		return "request and import an explanation first"
+		return "the AI reply did not explain this category"
 	case category.NeedsExpand:
-		return "low confidence: open the category on the Results screen first"
+		return "low confidence: open the category's details first"
 	default:
 		return "this category cannot be deleted"
 	}

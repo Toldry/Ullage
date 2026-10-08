@@ -46,3 +46,15 @@ export function errorLog(items: DeletionItem[]): string {
 }
 
 export const retryableStatuses: DeletionStatus[] = ['failed', 'partial'];
+
+// categoryWarnings lists each ready category's brute-force warning once, for the
+// confirmation, instead of repeating a long text on every item.
+export function categoryWarnings(items: DeletionItem[]): { name: string; warning: string }[] {
+  const seen = new Map<string, { name: string; warning: string }>();
+  for (const item of items) {
+    if (item.status === 'ready' && item.warning && !seen.has(item.category)) {
+      seen.set(item.category, { name: item.categoryName, warning: item.warning });
+    }
+  }
+  return [...seen.values()];
+}

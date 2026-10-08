@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { Kbd } from '../components/Controls';
 import { copyText } from '../lib/clipboard';
 import { checkLabels, exportApi } from '../lib/exporting';
-import { roundsOf, roundTitle, type Round } from '../lib/results';
 import { formatCount, formatDateTime } from '../lib/format';
-import type { CheckName, ExportView, PasteResult } from '../lib/types';
+import type { BatchView, CheckName, ExportView, PasteResult } from '../lib/types';
 import { BatchStepper } from './ExportScreen';
 
 interface Props {
@@ -12,15 +11,16 @@ interface Props {
   batch: number;
   onBatchChange: (batch: number) => void;
   onGoExport: () => void;
-  onGoResults: () => void;
+  onGoDelete: () => void;
   // Unparsed text per step, kept by the app so leaving step 5 does not lose it.
   drafts: Record<number, string>;
   onDraftChange: (round: number, text: string) => void;
 }
 
-const checkOrder: CheckName[] = ['session', 'complete', 'format', 'ids', 'duplicates'];
+const checkOrder: CheckName[] =
+  ['session', 'complete', 'format', 'ids', 'duplicates', 'explained'];
 
-export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResults, drafts,
+export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoDelete, drafts,
   onDraftChange }: Props) {
   const [view, setView] = useState<ExportView | null>(null);
   const [outcome, setOutcome] = useState<PasteResult | null>(null);
@@ -61,21 +61,20 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResul
       </div>
     );
   }
-  const rounds = roundsOf(view);
-  const current = rounds[Math.min(batch, rounds.length) - 1];
-  const explaining = current.kind === 'explain';
-  const nextBatch = view.batches.find((item) => !item.imported && item.number !== batch);
+  const batches = view.batches;
+  const current = batches[Math.min(batch, batches.length) - 1];
+  const nextBatch = batches.find((item) => !item.imported && item.number !== batch);
   const reviewing = current.imported && !replacing;
-  const replyName = explaining ? 'the explanations' : `batch ${current.number}`;
-  const parsed = outcome?.explanations ?? outcome?.result;
+  const replyName = `batch ${current.number}`;
+  const parsed = outcome?.result;
 
   return (
     <div class="screen screen-wide">
       <div class="screen-header">
         <PasteHeading code={view.code} />
-        <BatchStepper count={rounds.length} current={current.number}
-          title={roundTitle(current, view.batches.length)}
-          done={(number) => rounds[number - 1].imported}
+        <BatchStepper count={batches.length} current={current.number}
+          title={`Batch ${current.number} of ${batches.length}`}
+          done={(number) => batches[number - 1].imported}
           onPick={(number) => {
             onBatchChange(number);
             setOutcome(null);
@@ -85,10 +84,10 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResul
       <div class="export-grid">
         <div class="paste-column">
           {reviewing && (
-            <ImportedReply round={current} onReplace={() => {
+            <ImportedReply batch={current} onReplace={() => {
               setReplacing(true);
               setOutcome(null);
-            }} onGoResults={onGoResults} />
+            }} onGoDelete={onGoDelete} />
           )}
           {!reviewing && (<>
           <div class="panel">
@@ -131,8 +130,8 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResul
           </div>
           </>)}
           {outcome && (
-            <Outcome outcome={outcome} batchNumber={current.number} explaining={explaining}
-              batchCount={view.batches.length} nextBatch={nextBatch?.number}
+            <Outcome outcome={outcome} batchNumber={current.number}
+              batchCount={batches.length} nextBatch={nextBatch?.number}
               copyNote={copyNote} repairElement={repairElement}
               onCopyRepair={async () => {
                 const result = await copyText(outcome.repair ?? '', repairElement.current);
@@ -140,7 +139,7 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResul
                   : 'The text is selected: press Ctrl+C.');
               }}
               onNextBatch={(number) => { onBatchChange(number); clear(); onGoExport(); }}
-              onCopyPromptAgain={onGoExport} onGoResults={onGoResults} />
+              onCopyPromptAgain={onGoExport} onGoDelete={onGoDelete} />
           )}
         </div>
         <div class="side-column">
@@ -158,15 +157,13 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResul
                   <span class={`check-label check-${state}`}>
                     {state === 'skip' ? '–' : state}
                   </span>
-                  <span>
-                    {explaining && check === 'ids' ? 'Category numbers' : checkLabels[check]}
-                  </span>
+                  <span>{checkLabels[check]}</span>
                 </div>
               );
             })}
           </div>
           <div class="panel">
-            {rounds.map((item) => (
+            {batches.map((item) => (
               <button type="button" key={item.number}
                 class={`batch-row${item.number === current.number ? ' active' : ''}`}
                 onClick={() => {
@@ -174,14 +171,11 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResul
                   setOutcome(null);
                   setReplacing(false);
                 }}>
-                <span>
-                  {item.kind === 'explain' ? `Round ${item.number}` : `Batch ${item.number}`}
-                </span>
+                <span>Batch {item.number}</span>
                 <span class={`small ${item.imported ? 'ok-text' : 'faint'}`}>
                   {!item.imported ? 'not imported'
-                    : item.kind === 'explain' ? `${item.categoryCount} explained`
-                      : `${item.categoryCount} categories · ` +
-                        `${formatCount(item.classifiedItems)} of ${formatCount(item.items)} items`}
+                    : `${item.categoryCount} categories · ` +
+                      `${formatCount(item.classifiedItems)} of ${formatCount(item.items)} items`}
                 </span>
               </button>
             ))}
@@ -196,39 +190,30 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResul
   );
 }
 
-// ImportedReply shows a step's reply exactly as it was pasted, for review. A batch can be
-// replaced with a new reply; an explanation round stays as imported, because categories
-// it left out are simply queued again.
-function ImportedReply(props: { round: Round; onReplace: () => void; onGoResults: () => void }) {
-  const { round } = props;
+// ImportedReply shows a batch's reply exactly as it was pasted, for review. It can be
+// replaced with a new reply.
+function ImportedReply(props: { batch: BatchView; onReplace: () => void;
+  onGoDelete: () => void }) {
+  const { batch } = props;
   return (
     <div class="panel imported-reply">
       <div class="panel-header export-header">
         <span>Imported reply</span>
         <span class="cell-mono faint normal-case">
-          {round.importedAt ? formatDateTime(round.importedAt) : ''} ·{' '}
-          {round.kind === 'explain' ? `${round.categoryCount} explained`
-            : `${round.categoryCount} categories`}
-          {round.stillQueued ? ` · ${round.stillQueued} left queued` : ''}
+          {batch.importedAt ? formatDateTime(batch.importedAt) : ''} ·{' '}
+          {batch.categoryCount} categories
         </span>
         <span class="spacer" />
         <span class="faint normal-case">read-only · kept until Ullage closes</span>
       </div>
-      <pre class="reply-text">{round.reply || '(not available)'}</pre>
+      <pre class="reply-text">{batch.reply || '(not available)'}</pre>
       <div class="start-row reply-actions">
-        <button type="button" class="button button-primary" onClick={props.onGoResults}>
-          See results
+        <button type="button" class="button button-primary" onClick={props.onGoDelete}>
+          Review and delete
         </button>
-        {round.kind === 'batch' ? (
-          <button type="button" class="button" onClick={props.onReplace}>
-            Paste a new reply
-          </button>
-        ) : (
-          <span class="small faint">
-            To explain categories this round left out, request them again on the Results
-            screen; they go into a new round.
-          </span>
-        )}
+        <button type="button" class="button" onClick={props.onReplace}>
+          Paste a new reply
+        </button>
       </div>
     </div>
   );
@@ -237,7 +222,7 @@ function ImportedReply(props: { round: Round; onReplace: () => void; onGoResults
 function PasteHeading({ code }: { code: string }) {
   return (
     <div class="heading">
-      <div class="step-label">Step 5 of 7</div>
+      <div class="step-label">Step 5 of 6</div>
       <h1>Paste response</h1>
       <p class="lead">
         Paste the assistant's full reply. Ullage parses it in this tab and checks it
@@ -258,38 +243,14 @@ function Outcome(props: {
   onCopyRepair: () => void;
   onNextBatch: (number: number) => void;
   onCopyPromptAgain: () => void;
-  onGoResults: () => void;
-  explaining: boolean;
+  onGoDelete: () => void;
 }) {
   const { outcome } = props;
-  const parsed = outcome.explanations ?? outcome.result;
+  const parsed = outcome.result;
   const problems = parsed.problems;
   const sessionMismatch = problems.some((problem) => problem.check === 'session');
   const truncated = parsed.truncated && problems.length === 1;
-  const promptName = props.explaining ? 'explanation' : `batch ${props.batchNumber}`;
-  if (outcome.valid && outcome.explanations) {
-    const { explanations, missing } = outcome.explanations;
-    return (
-      <div class="result-card tone-ok">
-        <div class="result-title">
-          Imported {explanations.length}{' '}
-          {explanations.length === 1 ? 'explanation' : 'explanations'}
-        </div>
-        <div class="muted">
-          {missing.length
-            ? `${missing.length} requested ${missing.length === 1 ? 'category was' :
-              'categories were'} not explained and ${missing.length === 1 ? 'stays' : 'stay'} ` +
-              'queued for the next round.'
-            : 'Every requested category is explained.'}
-        </div>
-        <div class="actions">
-          <button type="button" class="button button-primary" onClick={props.onGoResults}>
-            Back to results
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const promptName = `batch ${props.batchNumber}`;
   if (outcome.valid) {
     const empty = outcome.result.categories.length === 0;
     return (
@@ -309,8 +270,8 @@ function Outcome(props: {
               Copy batch {props.nextBatch} prompt
             </button>
           ) : (
-            <button type="button" class="button button-primary" onClick={props.onGoResults}>
-              See results
+            <button type="button" class="button button-primary" onClick={props.onGoDelete}>
+              Review and delete
             </button>
           )}
         </div>

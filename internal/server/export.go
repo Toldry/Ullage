@@ -8,10 +8,6 @@ import (
 )
 
 func writeExportError(writer http.ResponseWriter, err error) {
-	if errors.Is(err, session.ErrRoundImported) {
-		writeJSONError(writer, http.StatusConflict, err.Error())
-		return
-	}
 	if errors.Is(err, session.ErrNoExport) {
 		writeJSON(writer, http.StatusConflict, map[string]string{"error": err.Error(),
 			"code": "no-export"})
@@ -62,21 +58,6 @@ func writeResultsError(writer http.ResponseWriter, err error) {
 
 func (server *Server) handleResults(writer http.ResponseWriter, _ *http.Request) {
 	view, err := server.manager.Results()
-	if err != nil {
-		writeResultsError(writer, err)
-		return
-	}
-	writeJSON(writer, http.StatusOK, view)
-}
-
-func (server *Server) handleRequestExplanation(writer http.ResponseWriter,
-	request *http.Request) {
-	var explanation session.ExplanationRequest
-	if err := decodeJSON(request, &explanation); err != nil {
-		writeJSONError(writer, http.StatusBadRequest, "invalid request: "+err.Error())
-		return
-	}
-	view, err := server.manager.RequestExplanation(explanation)
 	if err != nil {
 		writeResultsError(writer, err)
 		return

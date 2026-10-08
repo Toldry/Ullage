@@ -52,7 +52,7 @@ export function ScanScreen(props: Props) {
   return (
     <div class="screen">
       <div class="heading">
-        <div class="step-label">Step 1 of 7</div>
+        <div class="step-label">Step 1 of 6</div>
         <h1>{props.firstRun ? 'Choose what to scan' : 'Scan'}</h1>
         <p class="lead">
           Ullage reads file metadata on this PC: names, sizes and timestamps. It never opens

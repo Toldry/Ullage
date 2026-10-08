@@ -273,6 +273,20 @@ func TestWorkedExampleParses(t *testing.T) {
 	if !result.Valid() || len(result.Categories) != 4 {
 		t.Fatalf("worked example does not parse: %+v", result)
 	}
+	if result.Categories[0].What == "" || len(result.Categories[2].Steps) != 2 {
+		t.Fatalf("worked example lacks explanations: %+v", result.Categories)
+	}
+	if !strings.Contains(text, "under 25 words") || !strings.Contains(text, "1 to 5 step:") {
+		t.Fatalf("instructions do not state the explanation limits:\n%s", text)
+	}
+}
+
+// The instructions promise the limits the parser enforces.
+func TestExplanationLimitsMatchParser(t *testing.T) {
+	if ExplanationWordTarget != response.ExplanationWordTarget ||
+		ExplanationMaximumSteps != response.MaximumExplanationSteps {
+		t.Fatal("prompt and response packages disagree on explanation limits")
+	}
 }
 
 func TestContentAwareRollup(t *testing.T) {

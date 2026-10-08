@@ -160,24 +160,14 @@ func TestScanClassifyExplainAndRecycle(t *testing.T) {
 		return ""
 	}
 	code := exported.Code
-	reply := fmt.Sprintf("@SESSION %s\ncat|conf|regen|del|ids\nJavaScript packages|high|yes|1|%s\n"+
-		"Home videos|high|no|0|%s\n@END %s", code, idOf("node_modules"), idOf("Videos"), code)
+	reply := fmt.Sprintf("@SESSION %s\ncat|conf|regen|del|ids\n"+
+		"JavaScript packages|high|yes|1|%s\nwhat: npm packages.\nlost: Nothing.\n"+
+		"step: Reinstall with npm install.\nHome videos|high|no|0|%s\n@END %s", code,
+		idOf("node_modules"), idOf("Videos"), code)
 	var pasted struct{ Imported bool }
 	api.call(http.MethodPost, "/api/paste", map[string]any{"batch": 1, "text": reply}, &pasted)
 	if !pasted.Imported {
-		t.Fatal("round A not imported")
-	}
-
-	api.call(http.MethodPost, "/api/results/explain", map[string]any{"number": 1,
-		"queued": true}, nil)
-	var withRoundB struct{ Explanation struct{ Round int } }
-	api.call(http.MethodGet, "/api/export", nil, &withRoundB)
-	explanation := fmt.Sprintf("@SESSION %s\n#1\nwhat: npm packages.\nlost: Nothing.\n"+
-		"step: Reinstall with npm install.\n@END %s", code, code)
-	api.call(http.MethodPost, "/api/paste", map[string]any{
-		"batch": withRoundB.Explanation.Round, "text": explanation}, &pasted)
-	if !pasted.Imported {
-		t.Fatal("round B not imported")
+		t.Fatal("reply not imported")
 	}
 
 	var results struct {

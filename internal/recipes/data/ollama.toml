@@ -1,5 +1,5 @@
 id = "ollama-models"
-version = 1
+version = 2
 name = "Ollama models"
 what = "Local language models pulled or created with Ollama, stored as shared blobs plus manifests."
 lost = "Pulled models download again; models you created from a Modelfile must be rebuilt."
@@ -18,5 +18,7 @@ text = "Remove the ones you no longer use."
 command = "ollama rm <model>"
 
 [brute_force]
-allowed = false
-reason = "Blobs are shared between models; deleting files by hand corrupts the manifests."
+allowed = true
+warning = """\
+  Removes every model at once. Removing only some files breaks the models that share them; \
+  if Ollama is still installed, pull the models you need again afterwards."""

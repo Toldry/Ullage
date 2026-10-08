@@ -15,13 +15,6 @@ func RepairPrompt(result Result, expectation Expectation) string {
 		expectation.Code, result.Problems)
 }
 
-// RepairExplanationPrompt is RepairPrompt for a round B reply.
-func RepairExplanationPrompt(result ExplanationResult,
-	expectation ExplanationExpectation) string {
-	return repairText("the explanations", "the explanations", expectation.Code,
-		result.Problems)
-}
-
 func repairText(subject, scope, code string, problems []Problem) string {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Your reply for %s (session %s) has problems:\n", subject, code)

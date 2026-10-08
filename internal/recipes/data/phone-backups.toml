@@ -1,5 +1,5 @@
 id = "phone-backups"
-version = 1
+version = 2
 name = "iPhone and iPad backups"
 what = """\
   Full device backups made by iTunes or the Apple Devices app, one folder per backup."""
@@ -20,7 +20,8 @@ text = """\
   longer need. In iTunes: Edit > Preferences > Devices."""
 
 [brute_force]
-allowed = false
-reason = """\
-  Backups may be the only copy of a device's data, and the Apple app keeps an index of \
-  them; delete them from the app after checking which device each one belongs to."""
+allowed = true
+warning = """\
+  A backup may be the only copy of photos and messages from an old or lost device; it cannot \
+  be recovered after the Recycle Bin is emptied. The Apple Devices app or iTunes may still \
+  list deleted backups until it is restarted."""

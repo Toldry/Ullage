@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { Kbd } from '../components/Controls';
 import { copyText } from '../lib/clipboard';
 import {
-  deletionApi, errorLog, retryableStatuses, splitPath, statusLabels, type Tone,
+  categoryWarnings, deletionApi, errorLog, retryableStatuses, splitPath, statusLabels, type Tone,
 } from '../lib/deletion';
 import { formatBytes, formatCount, formatDuration, pluralize } from '../lib/format';
 import type { DeletionItem, DeletionPlan, DeletionRun, Tally } from '../lib/types';
@@ -119,7 +119,7 @@ export function DeleteScreen({ guard, keys, volumeName, onDone }: Props) {
     <div class="screen screen-wide">
       <div class="screen-header">
         <div class="heading">
-          <div class="step-label">Step 7 of 7</div>
+          <div class="step-label">Step 6 of 6</div>
           <h1>{heading(phase, plan, run, count)}</h1>
           <p class="lead">{lead(phase)}</p>
         </div>
@@ -134,7 +134,7 @@ export function DeleteScreen({ guard, keys, volumeName, onDone }: Props) {
             </button>
           ) : (
             <button type="button" class="button button-with-key" onClick={leave}>
-              Back to results
+              Back to the list
               <Kbd>Esc</Kbd>
             </button>
           )}
@@ -197,6 +197,12 @@ export function DeleteScreen({ guard, keys, volumeName, onDone }: Props) {
               </span>
             </div>
           )}
+          {categoryWarnings(plan.items).map((entry) => (
+            <div class="cloud-note small" key={entry.name} role="note">
+              <span class="strong warn-text">⚠ {entry.name}:</span>{' '}
+              <span class="muted">{entry.warning}</span>
+            </div>
+          ))}
           <div class="option-pair">
             <OptionCard selected={!permanent} onSelect={() => setPermanent(false)}
               title="Move to Recycle Bin" hint="default"
@@ -447,6 +453,11 @@ function ItemRow({ item, active }: { item: DeletionItem; active: boolean }) {
         {item.cloudSync && (
           <span class="small warn-text">
             Cloud-synced: also deleted from the cloud and your other devices.
+          </span>
+        )}
+        {item.warning && (
+          <span class="small warn-text" title={item.warning}>
+            ⚠ Managed cleanup preferred; see the warning below the list.
           </span>
         )}
       </span>

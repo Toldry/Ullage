@@ -270,3 +270,16 @@ conversation, in appropriate Markdown files.
 - Extensions do not need to be hidden or redacted (D-031).
 - Small files never reach the prompt individually. Only a folder holding a collection of
   small files large enough to be worth examining appears, as one line (D-032; Phase 3).
+
+### A-6 (after Phase 6): explanations in the reply, six steps, brute force with warnings
+
+- Explanations are not requested per category. They are an integral part of the export
+  prompt's reply, even if that means more batches. This replaces the lazy round B in
+  Phase 4 (D-066, D-069).
+- The Results step is removed as a separate step: after "Paste response" comes "Delete",
+  which shows the categories with their explanations and then checks, confirms and
+  deletes on the same page (D-067).
+- Recipes whose owning tool may already be uninstalled (for example Rust toolchains)
+  allow brute-force removal, with a ⚠ warning explaining what it may break. This
+  replaces "managed only" for the Docker Desktop disk image (D-068).
+

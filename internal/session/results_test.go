@@ -10,9 +10,10 @@ import (
 	"github.com/toldry/ullage/internal/results"
 )
 
-// roundAFixture exports the fixture scan with "northwind" redacted and imports one reply:
-// a low-confidence deletable category, a keep category and a medium one.
-func roundAFixture(t *testing.T) (*Manager, ExportView, map[string]string) {
+// importedFixture exports the fixture scan with "northwind" redacted and imports one
+// reply: a low-confidence deletable category, a keep category and a medium one. The
+// deletable ones carry explanation lines, which mention the redacted names by placeholder.
+func importedFixture(t *testing.T) (*Manager, ExportView, map[string]string) {
 	t.Helper()
 	manager := exportingManager(t, t.TempDir())
 	if _, err := manager.SaveRule(RuleRequest{Type: redact.RuleName, Pattern: "northwind",
@@ -42,11 +43,14 @@ func roundAFixture(t *testing.T) (*Manager, ExportView, map[string]string) {
 	}
 	reply := "@SESSION " + view.Code + "\ncat|conf|regen|del|ids\n" +
 		"Notes in " + lines["notesPlaceholder"] + "|low|no|1|" + lines["notes"] + "\n" +
+		"what: Notes kept in " + lines["notesPlaceholder"] + ".\nlost: The notes.\n" +
+		"step: Open them first.\n" +
 		"Client " + lines["clientsPlaceholder"] + " files|high|no|0|" + lines["clients"] +
-		"\n" + "Old photos|med|partially|1|" + lines["photos"] + "\n@END " + view.Code
+		"\n" + "Old photos|med|partially|1|" + lines["photos"] + "\nwhat: Photos.\n" +
+		"lost: Photos without another copy.\nstep: Check for a backup.\n@END " + view.Code
 	if pasted, err := manager.Paste(PasteRequest{Batch: 1, Text: reply}); err != nil ||
 		!pasted.Imported {
-		t.Fatalf("round A import failed: %+v %v", pasted, err)
+		t.Fatalf("import failed: %+v %v", pasted, err)
 	}
 	return manager, view, lines
 }
@@ -62,8 +66,8 @@ func findCategory(view ResultsView, key string) *results.Category {
 	return nil
 }
 
-func TestResultsAfterRoundA(t *testing.T) {
-	manager, view, _ := roundAFixture(t)
+func TestResultsAfterImport(t *testing.T) {
+	manager, view, _ := importedFixture(t)
 	resultsView, err := manager.Results()
 	if err != nil {
 		t.Fatal(err)
@@ -77,132 +81,54 @@ func TestResultsAfterRoundA(t *testing.T) {
 	if clients.Name != "Client northwind files" || clients.Selectable {
 		t.Fatalf("kept category = %+v", clients)
 	}
+	photos := findCategory(resultsView, "ai:3")
+	if !photos.Selectable || photos.ExplanationState != results.ExplanationReceived ||
+		photos.Explanation.Lost != "Photos without another copy." {
+		t.Fatalf("explained category = %+v", photos)
+	}
 	notes := findCategory(resultsView, "ai:1")
-	if !notes.NeedsExpand || notes.Selectable || !strings.Contains(notes.Name, "zorblax") {
+	if !notes.NeedsExpand || notes.Selectable || !strings.Contains(notes.Name, "zorblax") ||
+		!strings.Contains(notes.Explanation.What, "zorblax") {
 		t.Fatalf("low confidence category = %+v", notes)
 	}
-	// Expanding clears the low-confidence lock; the explanation lock (D-050) remains.
+	// Expanding clears the low-confidence lock.
 	expanded, err := manager.MarkExpanded("ai:1")
 	if unlocked := findCategory(expanded, "ai:1"); err != nil || unlocked.NeedsExpand ||
-		!unlocked.NeedsExplanation || unlocked.Selectable {
+		!unlocked.Selectable {
 		t.Fatalf("after expanding: %+v %v", unlocked, err)
 	}
 	if _, err := manager.MarkExpanded("ai:99"); !errors.Is(err, ErrNoSuchCategory) {
 		t.Fatalf("expanding an unknown category: %v", err)
 	}
-}
 
-func TestRoundBExplanations(t *testing.T) {
-	manager, view, _ := roundAFixture(t)
-	for _, number := range []int{3, 1} {
-		if _, err := manager.RequestExplanation(ExplanationRequest{Number: number,
-			Queued: true}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if _, err := manager.RequestExplanation(ExplanationRequest{Number: 42,
-		Queued: true}); !errors.Is(err, ErrNoSuchCategory) {
-		t.Fatalf("queueing an unknown category: %v", err)
-	}
-	exported, _ := manager.Export(false)
-	explanation := exported.Explanation
-	if explanation == nil || explanation.Round != 2 || explanation.Categories != 2 {
-		t.Fatalf("explanation view = %+v", explanation)
-	}
-	text := explanation.Text
-	// Round B sends the assistant's own names back, never the restored real ones.
-	for _, secret := range []string{"zorblax", "northwind"} {
-		if strings.Contains(strings.ToLower(text), secret) {
-			t.Fatalf("round B prompt contains %q:\n%s", secret, text)
-		}
-	}
-	if !strings.Contains(text, "under 25 words") || !strings.Contains(text, "@SESSION "+
-		view.Code) || strings.Index(text, "#3 Old photos") > strings.Index(text, "#1 Notes") {
-		t.Fatalf("round B prompt:\n%s", text)
-	}
-	categories := text[strings.Index(text, "Categories:\n")+len("Categories:\n"):]
-	for _, line := range strings.Split(strings.TrimSpace(categories), "\n") {
-		if !strings.HasPrefix(line, "#") && line != "(end of categories)" {
-			t.Fatalf("unexpected data line %q", line)
-		}
-	}
-
-	bad, _ := manager.Paste(PasteRequest{Batch: 2, Text: "@SESSION " + view.Code +
-		"\n#7\nwhat: x\nlost: y\nstep: z\n@END " + view.Code})
-	if bad.Imported || bad.Explanations == nil || !strings.Contains(bad.Repair, "#7") {
-		t.Fatalf("invalid round B reply: %+v", bad)
-	}
-	good, err := manager.Paste(PasteRequest{Batch: 2, Text: "@SESSION " + view.Code +
-		"\n#1\nwhat: Notes.\nlost: The notes.\nstep: Open them first.\n@END " + view.Code})
-	if err != nil || !good.Imported || good.Export.Explanation == nil ||
-		good.Export.Explanation.Round != 3 || good.Export.Explanation.Categories != 1 {
-		t.Fatalf("round B import: %+v %v", good, err)
-	}
-	resultsView, _ := manager.Results()
-	notes := findCategory(resultsView, "ai:1")
-	if notes.ExplanationState != results.ExplanationReceived ||
-		notes.Explanation.What != "Notes." || notes.Explanation.Round != 2 ||
-		findCategory(resultsView, "ai:3").ExplanationState != results.ExplanationQueued ||
-		resultsView.QueuedCount != 1 || resultsView.ExplanationRound != 3 {
-		t.Fatalf("results after round B = %+v", resultsView)
-	}
-	if expanded, _ := manager.MarkExpanded("ai:1"); !findCategory(expanded,
-		"ai:1").Selectable {
-		t.Fatalf("explained and expanded category not selectable: %+v", expanded)
-	}
-	if _, err := manager.RequestExplanation(ExplanationRequest{Number: 1,
-		Queued: true}); err == nil {
-		t.Fatal("an explained category was queued again")
-	}
-
-	// Importing batch 1 again replaces its categories; their explanations and queue
-	// entries go with them.
+	// Importing batch 1 again replaces its categories and forgets what was opened.
 	if again, _ := manager.Paste(PasteRequest{Batch: 1,
 		Text: replyFor(view.Code, view.Batches[0].Text)}); !again.Imported {
 		t.Fatalf("re-import failed: %+v", again)
 	}
 	resultsView, _ = manager.Results()
-	if resultsView.QueuedCount != 0 || resultsView.ExplanationRound != 0 ||
-		findCategory(resultsView, "ai:1") != nil || findCategory(resultsView, "ai:4") == nil {
+	if findCategory(resultsView, "ai:1") != nil || findCategory(resultsView, "ai:4") == nil {
 		t.Fatalf("results after re-import = %+v", resultsView)
-	}
-	if exported, _ := manager.Export(false); exported.Explanation != nil {
-		t.Fatalf("round B prompt left over: %+v", exported.Explanation)
 	}
 }
 
-// Imported replies and finished explanation rounds stay available for review, and the
-// rounds keep consecutive numbers after the batches.
-func TestImportedRepliesAndRoundsStayReviewable(t *testing.T) {
-	manager, view, _ := roundAFixture(t)
+// A deletable row without explanation lines is a problem with a repair prompt, not an
+// import (decision D-066).
+func TestUnexplainedDeletableRowIsNotImported(t *testing.T) {
+	manager, view, lines := importedFixture(t)
+	reply := "@SESSION " + view.Code + "\ncat|conf|regen|del|ids\nOld photos|med|no|1|" +
+		lines["photos"] + "\n@END " + view.Code
+	pasted, err := manager.Paste(PasteRequest{Batch: 1, Text: reply})
+	if err != nil || pasted.Imported || !strings.Contains(pasted.Repair, "what:") {
+		t.Fatalf("unexplained row: %+v %v", pasted, err)
+	}
+}
+
+// Imported replies stay available for review in step 5.
+func TestImportedRepliesStayReviewable(t *testing.T) {
+	manager, view, _ := importedFixture(t)
 	exported, _ := manager.Export(false)
 	if !strings.Contains(exported.Batches[0].Reply, "@SESSION "+view.Code) {
 		t.Fatalf("batch reply not kept: %q", exported.Batches[0].Reply)
-	}
-	for _, number := range []int{1, 3} {
-		if _, err := manager.RequestExplanation(ExplanationRequest{Number: number,
-			Queued: true}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	first := "@SESSION " + view.Code + "\n#1\nwhat: a\nlost: b\nstep: c\n@END " + view.Code
-	if pasted, _ := manager.Paste(PasteRequest{Batch: 2, Text: first}); !pasted.Imported {
-		t.Fatalf("round 2 not imported: %+v", pasted)
-	}
-	second := "@SESSION " + view.Code + "\n#3\nwhat: a\nlost: b\nstep: c\n@END " + view.Code
-	if pasted, _ := manager.Paste(PasteRequest{Batch: 3, Text: second}); !pasted.Imported {
-		t.Fatalf("round 3 not imported: %+v", pasted)
-	}
-	exported, _ = manager.Export(false)
-	rounds := exported.ExplanationRounds
-	if len(rounds) != 2 || rounds[0].Round != 2 || rounds[1].Round != 3 ||
-		rounds[0].Reply != first || rounds[1].Reply != second || !rounds[0].Imported ||
-		rounds[0].StillQueued != 1 || rounds[1].Explained != 1 ||
-		!strings.Contains(rounds[0].Text, "#3") || exported.Explanation != nil {
-		t.Fatalf("rounds = %+v, pending = %+v", rounds, exported.Explanation)
-	}
-	if _, err := manager.Paste(PasteRequest{Batch: 2, Text: first}); !errors.Is(err,
-		ErrRoundImported) {
-		t.Fatalf("pasting into an imported round: %v", err)
 	}
 }

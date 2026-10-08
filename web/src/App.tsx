@@ -42,7 +42,10 @@ export function App() {
   const [batch, setBatch] = useState(1);
   const [exportCode, setExportCode] = useState('');
   const onExportLoaded = useCallback((view: ExportView) => setExportCode(view.code), []);
-  // Selected result items, kept here so step 7 can pick them up.
+  // Step 6 first lists the categories to choose from ('select'), then checks, confirms and
+  // deletes the chosen items on the same page ('confirm').
+  const [deletePhase, setDeletePhase] = useState<'select' | 'confirm'>('select');
+  // Selected result items, kept here so they survive leaving step 6.
   const [deletionSelection, setDeletionSelection] = useState<Set<string>>(new Set());
   const onResultsLoaded = useCallback((categories: ResultCategory[]) =>
     setDeletionSelection((previous) => pruneSelection(categories, previous)), []);
@@ -148,15 +151,16 @@ export function App() {
     if (result) setError('Relaunching as administrator. A new tab will open; close this one.');
   }, [guard]);
 
-  const reachedStep = overview ? (deletionSelection.size > 0 ? 7 : 6) : 1;
+  const reachedStep = overview ? 6 : 1;
 
   const navigate = useCallback((target: Screen) => {
     if (target === 'scan' && screen === 'scanning') return;
-    const needsScan: Screen[] = ['overview', 'redact', 'export', 'paste', 'results', 'delete'];
+    const needsScan: Screen[] = ['overview', 'redact', 'export', 'paste', 'delete'];
     if (needsScan.includes(target) && !overview) return;
-    if (target === 'delete' && deletionSelection.size === 0) return;
+    // Opening step 6 from elsewhere shows the category list, never a stale confirmation.
+    if (target === 'delete' && screen !== 'delete') setDeletePhase('select');
     if ([...needsScan, 'scan', 'rules', 'history'].includes(target)) setScreen(target);
-  }, [screen, overview, deletionSelection]);
+  }, [screen, overview]);
 
   const startFromKeyboard = useCallback(() => {
     const roots = volumes.filter((volume) => selected.has(volume.root)).map((v) => v.root);
@@ -175,8 +179,7 @@ export function App() {
     else if (event.key === '3') navigate('redact');
     else if (event.key === '4') navigate('export');
     else if (event.key === '5') navigate('paste');
-    else if (event.key === '6') navigate('results');
-    else if (event.key === '7') navigate('delete');
+    else if (event.key === '6') navigate('delete');
     else if (event.key === 'h' || event.key === 'H') navigate('history');
     else if (event.key === 'r' || event.key === 'R') navigate('rules');
     else if (event.key === 't' || event.key === 'T') toggleTheme();
@@ -215,7 +218,7 @@ export function App() {
 
   const crumbs: Record<Screen, string> = {
     scan: 'Scan', scanning: 'Scanning', overview: 'Overview', redact: 'Redaction',
-    export: 'Export prompt', paste: 'Paste response', results: 'Results', delete: 'Delete',
+    export: 'Export prompt', paste: 'Paste response', delete: 'Delete',
     rules: 'Redaction rules', history: 'History',
   };
   const scanMeta = screen === 'scanning' && progress?.expectedBytes
@@ -297,21 +300,21 @@ export function App() {
           {screen === 'paste' && (
             <PasteScreen guard={guard} batch={batch} onBatchChange={setBatch}
               onGoExport={() => setScreen('export')}
-              onGoResults={() => setScreen('results')}
+              onGoDelete={() => navigate('delete')}
               drafts={pasteDrafts} onDraftChange={onDraftChange} />
           )}
-          {screen === 'results' && (
+          {screen === 'delete' && deletePhase === 'select' && (
             <ResultsScreen guard={guard} selection={deletionSelection}
               onSelectionChange={setDeletionSelection} onResultsLoaded={onResultsLoaded}
-              onGoExport={(round) => { setBatch(round); setScreen('export'); }}
+              onGoPaste={() => setScreen('paste')}
               onRescan={() => { setError(''); setScreen('scan'); }}
-              onReviewDeletion={() => setScreen('delete')} refreshToken={resultsRefresh} />
+              onReviewDeletion={() => setDeletePhase('confirm')} refreshToken={resultsRefresh} />
           )}
-          {screen === 'delete' && (
+          {screen === 'delete' && deletePhase === 'confirm' && (
             <DeleteScreen guard={guard} keys={[...deletionSelection]}
               volumeName={statusVolume?.name ?? 'this drive'}
               onDone={(changed) => {
-                setScreen('results');
+                setDeletePhase('select');
                 if (changed) setResultsRefresh((previous) => previous + 1);
               }} />
           )}

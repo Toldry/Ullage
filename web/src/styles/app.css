@@ -2302,7 +2302,7 @@ h1 {
   outline: none;
 }
 
-/* Delete (step 7) */
+/* Delete (step 6) */
 
 
 
@@ -2544,6 +2544,47 @@ h1 {
   border: 1px solid var(--warn-bd);
   border-radius: 3px;
   color: var(--warn);
+}
+
+/* The explanation sits under its row, aligned with the category name (D-067). */
+.results-row.has-explanation {
+  border-bottom: none;
+}
+
+.results-explanation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  padding: 0 12px 9px 56px;
+  border-bottom: 1px solid var(--line);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.results-explanation.focused {
+  background: var(--bg3);
+  box-shadow: inset 2px 0 0 var(--fg3);
+}
+
+.results-table > .results-explanation:last-child {
+  border-bottom: none;
+}
+
+.warning-badge {
+  flex: none;
+  font-size: 11px;
+  line-height: 17px;
+  padding: 0 5px;
+  border: 1px solid var(--warn-bd);
+  border-radius: 3px;
+  color: var(--warn);
+}
+
+.brute-warning {
+  padding: 8px 10px;
+  border: 1px solid var(--warn-bd);
+  background: var(--warn-bg);
+  border-radius: 5px;
 }
 
 .cloud-note {

@@ -35,7 +35,7 @@ How to judge:
 Reply with only this block, nothing before or after it:
 @SESSION %[1]s
 cat|conf|regen|del|ids
-(one row per category)
+(one row per category, each followed by its explanation lines)
 @END %[1]s
 
 Columns:
@@ -46,17 +46,39 @@ Columns:
 - ids: the IDs in the category, comma-separated, with ranges like 3-33.
 Put each ID in at most one category. Leave out IDs you cannot judge; they stay unknown.
 
+Explanation lines, directly below their row, for someone deciding whether to delete:
+- what: what this data is.
+- lost: what is lost if it is deleted.
+- step: one step of the safest way to free this space; 1 to %[4]d step: lines.
+A row with del 1 must have all three; for del 0 they are optional.
+Keep each line under %[5]d words, plain text, no Markdown. Write steps for any user.
+
 A complete example reply, for a different list:
 @SESSION %[2]s
 cat|conf|regen|del|ids
 Old program installers|high|yes|1|1,4
+what: Setup files for programs that are already installed.
+lost: Nothing; the programs keep working and can be downloaded again.
+step: Delete the installers.
 Family photos|high|no|0|2-3
 Video editing render cache|med|yes|1|5-9
+what: Preview files a video editor makes to play edits smoothly.
+lost: Nothing; the editor makes them again, more slowly at first.
+step: In the editor, clear the render cache.
+step: Or close the editor and delete the folder.
 Unrecognized app data|low|no|0|10
 @END %[2]s
 
 %[3]s
 `
+
+// The explanation limits the instructions state. The response package enforces looser
+// hard limits, so a reply slightly over the target still imports; a test keeps the two
+// packages in step.
+const (
+	ExplanationWordTarget   = 25
+	ExplanationMaximumSteps = 5
+)
 
 // exampleSessionCode differs from every real code, so a reply that copies the example
 // verbatim fails the session check instead of being imported.
@@ -71,7 +93,7 @@ func wrapBatch(batch Batch, batchCount int, code string) string {
 				"one separately."
 		}
 		return fmt.Sprintf(instructionsTemplate, code, exampleSessionCode,
-			intro+"\n\nData:\n"+data)
+			intro+"\n\nData:\n"+data, ExplanationMaximumSteps, ExplanationWordTarget)
 	}
 	return fmt.Sprintf("Batch %d of %d for the same task. Same rules and reply format as "+
 		"before, with the same session code. Reply with only the block for this batch.\n\n"+

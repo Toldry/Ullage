@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  pruneSelection, restKey, roundsOf, roundTitle, selectedTotals, selectionState,
-  toggleCategory,
+  pruneSelection, restKey, selectedTotals, selectionState, toggleCategory,
 } from './results';
-import type { ExportView, ResultCategory } from './types';
+import type { ResultCategory } from './types';
 
 function category(key: string, overrides: Partial<ResultCategory> = {}): ResultCategory {
   return {
@@ -39,30 +38,5 @@ describe('result selection', () => {
     expect([...pruneSelection([open], selection)].sort()).toEqual(['ai:1|id:1', 'ai:1|id:2']);
     const locked = category('ai:1', { needsExpand: true, selectable: false });
     expect(pruneSelection([locked], selection).size).toBe(0);
-  });
-});
-
-describe('rounds', () => {
-  it('lists imported explanation rounds and the pending one after the batches', () => {
-    const explanation = (round: number, imported: boolean) => ({ round, text: `r${round}`,
-      categories: 2, characters: 1, tokenEstimate: 1, imported, explained: 1,
-      stillQueued: imported ? 1 : 0, reply: imported ? 'reply' : undefined });
-    const view = {
-      code: 'ABCDEF', items: 1, representedBytes: 0, unknownBytes: 0, minimumItemBytes: 0,
-      stale: false,
-      batches: [{ number: 1, firstId: 1, lastId: 1, lines: 1, items: 1, text: 'a',
-        characters: 1, tokenEstimate: 1, imported: true, categoryCount: 1,
-        classifiedItems: 1 }],
-      explanationRounds: [explanation(2, true), explanation(3, true)],
-      explanation: explanation(4, false),
-    } satisfies ExportView;
-    const rounds = roundsOf(view);
-    // Step N is rounds[N - 1]: the stepper can never show "4 of 3" again.
-    expect(rounds.map((round) => [round.number, round.kind, round.imported])).toEqual([
-      [1, 'batch', true], [2, 'explain', true], [3, 'explain', true], [4, 'explain', false]]);
-    rounds.forEach((round, index) => expect(round.number).toBe(index + 1));
-    expect(rounds[1].reply).toBe('reply');
-    expect(roundTitle(rounds[0], 1)).toBe('Batch 1 of 1');
-    expect(roundTitle(rounds[3], 1)).toBe('Explanations · round 4');
   });
 });

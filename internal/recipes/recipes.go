@@ -40,6 +40,10 @@ type ManagedStep struct {
 type BruteForcePolicy struct {
 	Allowed bool   `toml:"allowed" json:"allowed"`
 	Reason  string `toml:"reason" json:"reason,omitempty"`
+	// Warning says what can go wrong when the managed steps are skipped, for recipes where
+	// they are the better way but deleting is still reasonable (an uninstalled tool's
+	// leftovers). It is shown wherever the items can be selected and confirmed.
+	Warning string `toml:"warning" json:"warning,omitempty"`
 }
 
 // Recipe describes one well-known kind of disk usage.
@@ -166,6 +170,8 @@ func (recipe *Recipe) validate() []string {
 	}
 	require(recipe.BruteForce.Allowed || strings.TrimSpace(recipe.BruteForce.Reason) != "",
 		"brute_force.reason is required when brute force is not allowed")
+	require(recipe.BruteForce.Allowed || strings.TrimSpace(recipe.BruteForce.Warning) == "",
+		"brute_force.warning is only for recipes that allow brute force")
 	require(recipe.Dynamic == "" || recipe.Dynamic == DynamicInstalledApplications,
 		"unknown dynamic source "+recipe.Dynamic)
 

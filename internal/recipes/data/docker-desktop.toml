@@ -1,5 +1,5 @@
 id = "docker-desktop-wsl"
-version = 1
+version = 2
 priority = 10
 name = "Docker Desktop WSL disk image"
 what = """\
@@ -39,7 +39,8 @@ text = "Compact the disk image (elevated PowerShell, needs the Hyper-V module)."
 command = "Optimize-VHD -Path \"$env:LOCALAPPDATA\\Docker\\wsl\\disk\\docker_data.vhdx\" -Mode Full"
 
 [brute_force]
-allowed = false
-reason = """\
-  Deleting the disk image under an installed Docker Desktop breaks it. To start over, use \
-  Docker Desktop > Troubleshoot > Clean / Purge data."""
+allowed = true
+warning = """\
+  Destroys every image, container and volume, including database data in volumes. If Docker \
+  Desktop is still installed it stops working until you reset it with Troubleshoot > Clean / \
+  Purge data. Quit Docker Desktop and run wsl --shutdown first, or the file is in use."""

@@ -220,33 +220,10 @@ export interface ExportView {
   unknownBytes: number;
   minimumItemBytes: number;
   stale: boolean;
-  explanationRounds: ExplanationView[];
-  explanation?: ExplanationView;
 }
 
-// Round B prompt (internal/session/results.go)
-export interface ExplanationView {
-  round: number;
-  text: string;
-  categories: number;
-  characters: number;
-  tokenEstimate: number;
-  imported: boolean;
-  reply?: string;
-  importedAt?: string;
-  explained: number;
-  stillQueued: number;
-}
-
-export interface ParsedExplanation {
-  number: number;
-  what: string;
-  lost: string;
-  steps: string[];
-  line: number;
-}
-
-export type CheckName = 'session' | 'complete' | 'format' | 'ids' | 'duplicates';
+export type CheckName =
+  | 'session' | 'complete' | 'format' | 'ids' | 'duplicates' | 'explained';
 
 export interface Problem {
   line: number;
@@ -262,6 +239,9 @@ export interface ParsedCategory {
   deletable: boolean;
   ids: number[];
   line: number;
+  what?: string;
+  lost?: string;
+  steps?: string[];
 }
 
 export interface PasteResult {
@@ -272,14 +252,6 @@ export interface PasteResult {
     categories: ParsedCategory[];
     problems: Problem[];
     classified: number;
-  };
-  explanations?: {
-    found: boolean;
-    foundCode: string;
-    truncated: boolean;
-    explanations: ParsedExplanation[];
-    missing: number[];
-    problems: Problem[];
   };
   valid: boolean;
   repair?: string;
@@ -298,8 +270,6 @@ export interface ResultExplanation {
   lost: string;
   steps: ResultStep[];
   note?: string;
-  round?: number;
-  receivedAt?: string;
 }
 
 export interface ResultItem {
@@ -334,8 +304,9 @@ export interface ResultCategory {
   moreItems: number;
   moreBytes: number;
   explanation?: ResultExplanation;
-  explanationState: 'recipe' | 'none' | 'queued' | 'received';
-  bruteForce: { allowed: boolean; reason?: string };
+  explanationState: 'recipe' | 'none' | 'received';
+  // warning: brute force is allowed, but the managed steps are the better way.
+  bruteForce: { allowed: boolean; reason?: string; warning?: string };
   needsExpand: boolean;
   needsExplanation: boolean;
   cloudSyncItems: number;
@@ -356,8 +327,6 @@ export interface ResultsView {
   code: string;
   batchCount: number;
   batchesImported: number;
-  queuedCount: number;
-  explanationRound: number;
   minimumItemBytes: number;
 }
 
@@ -377,6 +346,8 @@ export interface DeletionItem {
   reason?: string;
   nowBytes?: number;
   cloudSync?: boolean;
+  // The recipe's brute-force warning: what can break when the managed steps are skipped.
+  warning?: string;
 }
 
 export interface Tally {

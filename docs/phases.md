@@ -243,3 +243,30 @@ Deviations reported: D-059 to D-064; design conflicts 21 and 22.
 
 Review outcome: approved, with one change: logs are written, with sensitive information
 redacted (D-063 revised).
+
+## After Phase 6: explanations in the reply, six steps
+
+Requested by the owner (amendment A-6): explanations are part of every batch reply
+instead of a per-category round B; Results and Delete are one step; recipes whose
+owning tool may be gone allow brute force with a ⚠ warning; batches are smaller.
+
+Built:
+
+- Parser: `what:`, `lost:` and `step:` lines below each row, found by prefix first;
+  required for `del 1`; a new "Explanations" check with repair prompts (D-066).
+- Prompt: instructions and the worked example carry explanation lines; default batch
+  budget 150 data lines (D-069).
+- Removed: round B queue, prompt, parser, `/api/results/explain`, and their screens.
+- Step 6 "Delete": the category list with explanations inline, then verification,
+  confirmation and progress on the same page (D-067).
+- Recipes: `brute_force.warning`; seven recipes switched to brute force with a warning
+  (D-068). The warning is shown on the row, in the detail, and on the confirmation.
+
+Tested: parser fixtures for explanations (missing, duplicate, too many steps, before the
+first row, `|` in the text, Markdown tables), the worked example parses with its
+explanations, prompt and parser limits agree, recipe validation of warnings, results
+carry warnings and inline explanations, session import with explanations and refusal of
+an unexplained row, API end-to-end with explanations, and a headless Chromium run of
+export, a refused unexplained reply, import, the Delete list, the Rust toolchains
+warning and the confirmation.
+

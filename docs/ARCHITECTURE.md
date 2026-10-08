@@ -201,15 +201,17 @@ Step by step:
    through the redactor, assigns prompt IDs, and batches. The placeholder map stays in the
    process (and in the encrypted rules file).
 5. **Paste.** The parser extracts and validates. Only `(prompt ID set, closed enums, free-text
-   category name)` survives; the free text is display-only and HTML-escaped.
-6. **Results.** Recipe categories and AI categories are merged and sorted by reclaimable
-   size; real names are restored for display only in the local UI, from the placeholders
-   of items in the current export (D-047). Explanations of AI categories are lazy: the
-   user queues categories, and the next export round is a round B prompt that lists them
-   by number, the assistant's own name and IDs. Round B replies are display-only text
-   (what, lost, steps); they can never select, add or change items (D-045, D-046).
-7. **Delete.** The UI sends category and item IDs. The server resolves them against the
-   session, applies the guards in §5, re-verifies size and mtime, then recycles.
+   category name)` survives; the free text is display-only and HTML-escaped. Each
+   deletable category row must be followed by its explanation (`what:`, `lost:`, 1 to 5
+   `step:` lines), which is display-only too: it can never select, add or change items
+   (D-046, D-066).
+6. **Delete.** Recipe categories and AI categories are merged and sorted by reclaimable
+   size, each with its explanation under it; real names are restored for display only in
+   the local UI, from the placeholders of items in the current export (D-047). The user
+   selects items on the same page (D-067). The UI sends category and item IDs. The server
+   resolves them against the session, applies the guards in §5, re-verifies size and
+   mtime, then recycles. Recipes whose owning tool is the better way to clean up but may
+   be gone carry a brute-force warning that is shown before confirming (D-068).
 
 ---
 
