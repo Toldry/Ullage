@@ -3,7 +3,7 @@ import { Kbd } from '../components/Controls';
 import { SessionExpiredError } from '../lib/api';
 import { copyText } from '../lib/clipboard';
 import { exportApi } from '../lib/exporting';
-import { roundsOf } from '../lib/results';
+import { roundsOf, roundTitle } from '../lib/results';
 import { formatBytes, formatCount, pluralize } from '../lib/format';
 import { placeholderSegments } from '../lib/redaction';
 import type { ExportView } from '../lib/types';
@@ -96,7 +96,7 @@ export function ExportScreen({ guard, batch, onBatchChange, onGoPaste, onExportL
       <div class="screen-header">
         <ExportHeading />
         <BatchStepper count={rounds.length} current={current.number}
-          label={explaining ? 'Explanations' : undefined}
+          title={roundTitle(current, view.batches.length)}
           done={(number) => rounds[number - 1].imported} onPick={onBatchChange} />
       </div>
 
@@ -204,7 +204,8 @@ export function ExportScreen({ guard, batch, onBatchChange, onGoPaste, onExportL
                     : `${formatCount(item.items)} items`}
                 </span>
                 <span class={`small ${item.imported ? 'ok-text' : 'faint'}`}>
-                  {item.imported ? `imported · ${item.categoryCount} categories`
+                  {item.imported ? `imported · ${item.categoryCount} ` +
+                    (item.kind === 'explain' ? 'explained' : 'categories')
                     : item.number === current.number ? 'ready to copy' : 'not imported'}
                 </span>
               </button>
@@ -253,14 +254,14 @@ function Step(props: { number: number; text: string }) {
 export function BatchStepper(props: {
   count: number;
   current: number;
-  label?: string;
+  title: string;
   done: (number: number) => boolean;
   onPick: (number: number) => void;
 }) {
   return (
     <div class="batch-stepper">
       <span class="cell-mono faint">
-        {props.label ?? 'Batch'} {props.current} of {props.count}
+        {props.title}
       </span>
       <div class="stepper-dots">
         {Array.from({ length: props.count }, (_, index) => index + 1).map((number) => (

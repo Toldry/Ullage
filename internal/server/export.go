@@ -8,6 +8,10 @@ import (
 )
 
 func writeExportError(writer http.ResponseWriter, err error) {
+	if errors.Is(err, session.ErrRoundImported) {
+		writeJSONError(writer, http.StatusConflict, err.Error())
+		return
+	}
 	if errors.Is(err, session.ErrNoExport) {
 		writeJSON(writer, http.StatusConflict, map[string]string{"error": err.Error(),
 			"code": "no-export"})

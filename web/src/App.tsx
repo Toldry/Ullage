@@ -47,6 +47,10 @@ export function App() {
   const onResultsLoaded = useCallback((categories: ResultCategory[]) =>
     setDeletionSelection((previous) => pruneSelection(categories, previous)), []);
   const [resultsRefresh, setResultsRefresh] = useState(0);
+  // Unparsed replies per step 5 round, so leaving the step does not lose them.
+  const [pasteDrafts, setPasteDrafts] = useState<Record<number, string>>({});
+  const onDraftChange = useCallback((round: number, text: string) =>
+    setPasteDrafts((previous) => ({ ...previous, [round]: text })), []);
   const appElement = useRef<HTMLDivElement>(null);
 
   // Any rejected session (wrong or missing token) switches to the invalid-link state.
@@ -293,7 +297,8 @@ export function App() {
           {screen === 'paste' && (
             <PasteScreen guard={guard} batch={batch} onBatchChange={setBatch}
               onGoExport={() => setScreen('export')}
-              onGoResults={() => setScreen('results')} />
+              onGoResults={() => setScreen('results')}
+              drafts={pasteDrafts} onDraftChange={onDraftChange} />
           )}
           {screen === 'results' && (
             <ResultsScreen guard={guard} selection={deletionSelection}

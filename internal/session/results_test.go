@@ -170,3 +170,39 @@ func TestRoundBExplanations(t *testing.T) {
 		t.Fatalf("round B prompt left over: %+v", exported.Explanation)
 	}
 }
+
+// Imported replies and finished explanation rounds stay available for review, and the
+// rounds keep consecutive numbers after the batches.
+func TestImportedRepliesAndRoundsStayReviewable(t *testing.T) {
+	manager, view, _ := roundAFixture(t)
+	exported, _ := manager.Export(false)
+	if !strings.Contains(exported.Batches[0].Reply, "@SESSION "+view.Code) {
+		t.Fatalf("batch reply not kept: %q", exported.Batches[0].Reply)
+	}
+	for _, number := range []int{1, 3} {
+		if _, err := manager.RequestExplanation(ExplanationRequest{Number: number,
+			Queued: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first := "@SESSION " + view.Code + "\n#1\nwhat: a\nlost: b\nstep: c\n@END " + view.Code
+	if pasted, _ := manager.Paste(PasteRequest{Batch: 2, Text: first}); !pasted.Imported {
+		t.Fatalf("round 2 not imported: %+v", pasted)
+	}
+	second := "@SESSION " + view.Code + "\n#3\nwhat: a\nlost: b\nstep: c\n@END " + view.Code
+	if pasted, _ := manager.Paste(PasteRequest{Batch: 3, Text: second}); !pasted.Imported {
+		t.Fatalf("round 3 not imported: %+v", pasted)
+	}
+	exported, _ = manager.Export(false)
+	rounds := exported.ExplanationRounds
+	if len(rounds) != 2 || rounds[0].Round != 2 || rounds[1].Round != 3 ||
+		rounds[0].Reply != first || rounds[1].Reply != second || !rounds[0].Imported ||
+		rounds[0].StillQueued != 1 || rounds[1].Explained != 1 ||
+		!strings.Contains(rounds[0].Text, "#3") || exported.Explanation != nil {
+		t.Fatalf("rounds = %+v, pending = %+v", rounds, exported.Explanation)
+	}
+	if _, err := manager.Paste(PasteRequest{Batch: 2, Text: first}); !errors.Is(err,
+		ErrRoundImported) {
+		t.Fatalf("pasting into an imported round: %v", err)
+	}
+}

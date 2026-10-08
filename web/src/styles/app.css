@@ -2658,3 +2658,24 @@ h1 {
     opacity: 0.25;
   }
 }
+
+/* Step 5: an imported reply, shown as pasted for review. */
+.reply-text {
+  margin: 0;
+  padding: 12px 14px;
+  max-height: 360px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--fg);
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+
+.reply-actions {
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--line);
+}

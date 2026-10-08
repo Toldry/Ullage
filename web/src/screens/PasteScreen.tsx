@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { Kbd } from '../components/Controls';
 import { copyText } from '../lib/clipboard';
 import { checkLabels, exportApi } from '../lib/exporting';
-import { roundsOf } from '../lib/results';
-import { formatCount } from '../lib/format';
+import { roundsOf, roundTitle, type Round } from '../lib/results';
+import { formatCount, formatDateTime } from '../lib/format';
 import type { CheckName, ExportView, PasteResult } from '../lib/types';
 import { BatchStepper } from './ExportScreen';
 
@@ -13,14 +13,21 @@ interface Props {
   onBatchChange: (batch: number) => void;
   onGoExport: () => void;
   onGoResults: () => void;
+  // Unparsed text per step, kept by the app so leaving step 5 does not lose it.
+  drafts: Record<number, string>;
+  onDraftChange: (round: number, text: string) => void;
 }
 
 const checkOrder: CheckName[] = ['session', 'complete', 'format', 'ids', 'duplicates'];
 
-export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResults }: Props) {
+export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResults, drafts,
+  onDraftChange }: Props) {
   const [view, setView] = useState<ExportView | null>(null);
-  const [text, setText] = useState('');
   const [outcome, setOutcome] = useState<PasteResult | null>(null);
+  // An imported step shows its reply for review until the user chooses to replace it.
+  const [replacing, setReplacing] = useState(false);
+  const text = drafts[batch] ?? '';
+  const setText = (next: string) => onDraftChange(batch, next);
   const [copyNote, setCopyNote] = useState('');
   const repairElement = useRef<HTMLPreElement>(null);
 
@@ -35,6 +42,10 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResul
     setOutcome(result);
     setView(result.export);
     setCopyNote('');
+    if (result.imported) {
+      setText('');
+      setReplacing(false);
+    }
   };
 
   const clear = () => {
@@ -54,6 +65,7 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResul
   const current = rounds[Math.min(batch, rounds.length) - 1];
   const explaining = current.kind === 'explain';
   const nextBatch = view.batches.find((item) => !item.imported && item.number !== batch);
+  const reviewing = current.imported && !replacing;
   const replyName = explaining ? 'the explanations' : `batch ${current.number}`;
   const parsed = outcome?.explanations ?? outcome?.result;
 
@@ -62,15 +74,28 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResul
       <div class="screen-header">
         <PasteHeading code={view.code} />
         <BatchStepper count={rounds.length} current={current.number}
-          label={explaining ? 'Explanations' : undefined}
+          title={roundTitle(current, view.batches.length)}
           done={(number) => rounds[number - 1].imported}
-          onPick={(number) => { onBatchChange(number); setOutcome(null); }} />
+          onPick={(number) => {
+            onBatchChange(number);
+            setOutcome(null);
+            setReplacing(false);
+          }} />
       </div>
       <div class="export-grid">
         <div class="paste-column">
+          {reviewing && (
+            <ImportedReply round={current} onReplace={() => {
+              setReplacing(true);
+              setOutcome(null);
+            }} onGoResults={onGoResults} />
+          )}
+          {!reviewing && (<>
           <div class="panel">
             <div class="panel-header export-header">
-              <span>Response</span>
+              <span>
+                {current.imported ? 'New response (replaces the imported one)' : 'Response'}
+              </span>
               <span class="cell-mono faint normal-case">
                 {formatCount(text.length)} characters
               </span>
@@ -95,9 +120,16 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResul
               <Kbd inverse>Ctrl Enter</Kbd>
             </button>
             <button type="button" class="button" onClick={clear}>Clear</button>
+            {current.imported && (
+              <button type="button" class="ghost-button" onClick={() => {
+                setReplacing(false);
+                setOutcome(null);
+              }}>Back to the imported reply</button>
+            )}
             <span class="spacer" />
             <span class="small faint">Pasted text never leaves this tab and this PC.</span>
           </div>
+          </>)}
           {outcome && (
             <Outcome outcome={outcome} batchNumber={current.number} explaining={explaining}
               batchCount={view.batches.length} nextBatch={nextBatch?.number}
@@ -115,7 +147,8 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResul
           <div class="panel checks">
             <div class="section-title">Checks</div>
             {checkOrder.map((check) => {
-              const state = !parsed ? 'skip'
+              // An imported reply passed every check; that is the only way it was imported.
+              const state = reviewing && !outcome ? 'pass' : !parsed ? 'skip'
                 : parsed.problems.some((problem) => problem.check === check) ? 'fail'
                   : check !== 'session' && check !== 'complete' && !parsed.found
                     ? 'skip' : 'pass';
@@ -133,16 +166,24 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResul
             })}
           </div>
           <div class="panel">
-            {view.batches.map((item) => (
-              <div class="batch-row static" key={item.number}>
-                <span>Batch {item.number}</span>
-                <span class={`small ${item.imported ? 'ok-text' : 'faint'}`}>
-                  {item.imported
-                    ? `${item.categoryCount} categories · ${formatCount(item.classifiedItems)} ` +
-                      `of ${formatCount(item.items)} items`
-                    : 'not imported'}
+            {rounds.map((item) => (
+              <button type="button" key={item.number}
+                class={`batch-row${item.number === current.number ? ' active' : ''}`}
+                onClick={() => {
+                  onBatchChange(item.number);
+                  setOutcome(null);
+                  setReplacing(false);
+                }}>
+                <span>
+                  {item.kind === 'explain' ? `Round ${item.number}` : `Batch ${item.number}`}
                 </span>
-              </div>
+                <span class={`small ${item.imported ? 'ok-text' : 'faint'}`}>
+                  {!item.imported ? 'not imported'
+                    : item.kind === 'explain' ? `${item.categoryCount} explained`
+                      : `${item.categoryCount} categories · ` +
+                        `${formatCount(item.classifiedItems)} of ${formatCount(item.items)} items`}
+                </span>
+              </button>
             ))}
           </div>
           <div class="small muted">
@@ -150,6 +191,44 @@ export function PasteScreen({ guard, batch, onBatchChange, onGoExport, onGoResul
             redacted names.
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ImportedReply shows a step's reply exactly as it was pasted, for review. A batch can be
+// replaced with a new reply; an explanation round stays as imported, because categories
+// it left out are simply queued again.
+function ImportedReply(props: { round: Round; onReplace: () => void; onGoResults: () => void }) {
+  const { round } = props;
+  return (
+    <div class="panel imported-reply">
+      <div class="panel-header export-header">
+        <span>Imported reply</span>
+        <span class="cell-mono faint normal-case">
+          {round.importedAt ? formatDateTime(round.importedAt) : ''} ·{' '}
+          {round.kind === 'explain' ? `${round.categoryCount} explained`
+            : `${round.categoryCount} categories`}
+          {round.stillQueued ? ` · ${round.stillQueued} left queued` : ''}
+        </span>
+        <span class="spacer" />
+        <span class="faint normal-case">read-only · kept until Ullage closes</span>
+      </div>
+      <pre class="reply-text">{round.reply || '(not available)'}</pre>
+      <div class="start-row reply-actions">
+        <button type="button" class="button button-primary" onClick={props.onGoResults}>
+          See results
+        </button>
+        {round.kind === 'batch' ? (
+          <button type="button" class="button" onClick={props.onReplace}>
+            Paste a new reply
+          </button>
+        ) : (
+          <span class="small faint">
+            To explain categories this round left out, request them again on the Results
+            screen; they go into a new round.
+          </span>
+        )}
       </div>
     </div>
   );

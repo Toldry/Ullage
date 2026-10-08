@@ -8,7 +8,9 @@ export const resultsApi = {
   expand: (key: string) => api.post<ResultsView>('/api/results/expand', { key }),
 };
 
-// One step of the Export and Paste screens: a round A batch or the round B prompt.
+// One step of the Export and Paste screens: a round A batch, an imported explanation
+// round kept for review, or the explanation prompt waiting to be sent. Numbers run on
+// from the batches, so step N is always rounds[N - 1].
 export interface Round {
   number: number;
   kind: 'batch' | 'explain';
@@ -19,17 +21,30 @@ export interface Round {
   imported: boolean;
   categoryCount: number;
   classifiedItems: number;
+  reply?: string;
+  importedAt?: string;
+  stillQueued?: number;
 }
 
 export function roundsOf(view: ExportView): Round[] {
   const rounds: Round[] = view.batches.map((batch) => ({ ...batch, kind: 'batch' as const }));
-  if (view.explanation) {
-    rounds.push({ number: view.explanation.round, kind: 'explain',
-      text: view.explanation.text, items: view.explanation.categories,
-      characters: view.explanation.characters, tokenEstimate: view.explanation.tokenEstimate,
-      imported: false, categoryCount: view.explanation.categories, classifiedItems: 0 });
+  const explanations = [...(view.explanationRounds ?? []),
+    ...(view.explanation ? [view.explanation] : [])];
+  for (const explanation of explanations) {
+    rounds.push({ number: explanation.round, kind: 'explain', text: explanation.text,
+      items: explanation.categories, characters: explanation.characters,
+      tokenEstimate: explanation.tokenEstimate, imported: explanation.imported,
+      categoryCount: explanation.imported ? explanation.explained : explanation.categories,
+      classifiedItems: 0, reply: explanation.reply, importedAt: explanation.importedAt,
+      stillQueued: explanation.stillQueued });
   }
   return rounds;
+}
+
+// roundTitle names a step for the stepper: "Batch 2 of 3" or "Explanations · round 4".
+export function roundTitle(round: Round, batchCount: number): string {
+  return round.kind === 'batch' ? `Batch ${round.number} of ${batchCount}`
+    : `Explanations · round ${round.number}`;
 }
 
 // Selection holds item keys. A category with more items than the list shows is selected

@@ -17,9 +17,11 @@ type explanationState struct {
 	nextNumber int
 	received   map[int]results.ReceivedExplanation
 	// queued keeps the order categories were requested in, which the prompt follows.
-	queued          []int
-	expanded        map[string]bool
-	completedRounds int
+	queued   []int
+	expanded map[string]bool
+	// rounds are the imported explanation rounds, kept with their prompt and reply so
+	// they can be looked at again on the Export and Paste screens.
+	rounds []ExplanationView
 }
 
 func newExplanationState() explanationState {
@@ -63,13 +65,20 @@ func (state *explanationState) forget(numbers []int) {
 	}
 }
 
-// ExplanationView is the round B prompt on the Export and Paste screens.
+// ExplanationView is a round B prompt on the Export and Paste screens: the one waiting
+// to be sent, or an imported one kept for review.
 type ExplanationView struct {
 	Round         int    `json:"round"`
 	Text          string `json:"text"`
 	Categories    int    `json:"categories"`
 	Characters    int    `json:"characters"`
 	TokenEstimate int    `json:"tokenEstimate"`
+	// Imported rounds keep the reply as pasted. It stays in memory for this session only.
+	Imported    bool      `json:"imported"`
+	Reply       string    `json:"reply,omitempty"`
+	ImportedAt  time.Time `json:"importedAt,omitempty"`
+	Explained   int       `json:"explained"`
+	StillQueued int       `json:"stillQueued"`
 }
 
 // importedCategory finds an imported category by number. Callers hold manager.lock.
@@ -93,7 +102,7 @@ func (manager *Manager) explanationRound() int {
 	if state.export == nil || len(state.explanations.queued) == 0 {
 		return 0
 	}
-	return len(state.export.Batches) + state.explanations.completedRounds + 1
+	return len(state.export.Batches) + len(state.explanations.rounds) + 1
 }
 
 func (manager *Manager) explanationRequests() []prompt.ExplanationRequest {
@@ -136,12 +145,16 @@ func (manager *Manager) pasteExplanations(text string) PasteResult {
 		len(parsed.Explanations), len(parsed.Missing), len(parsed.Problems))
 	if result.Valid {
 		now := time.Now()
+		completed := *manager.explanationView()
+		completed.Imported, completed.Reply, completed.ImportedAt = true, text, now
+		completed.Explained, completed.StillQueued = len(parsed.Explanations),
+			len(parsed.Missing)
+		state.explanations.rounds = append(state.explanations.rounds, completed)
 		for _, explanation := range parsed.Explanations {
 			state.explanations.received[explanation.Number] = results.ReceivedExplanation{
 				Explanation: explanation, Round: expectation.Round, ReceivedAt: now}
 			state.explanations.unqueue(explanation.Number)
 		}
-		state.explanations.completedRounds++
 		result.Imported = true
 	} else {
 		result.Repair = response.RepairExplanationPrompt(parsed, expectation)

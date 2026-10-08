@@ -27,16 +27,20 @@ type BatchImport struct {
 	// can refer to it even after other batches are imported again.
 	Numbers    []int     `json:"numbers"`
 	ImportedAt time.Time `json:"importedAt"`
+	// Reply is the text as pasted, kept in memory so it can be reviewed in step 5.
+	Reply string `json:"-"`
 }
 
 // BatchView describes one batch on the Export and Paste screens.
 type BatchView struct {
 	prompt.Batch
-	Characters      int  `json:"characters"`
-	TokenEstimate   int  `json:"tokenEstimate"`
-	Imported        bool `json:"imported"`
-	CategoryCount   int  `json:"categoryCount"`
-	ClassifiedItems int  `json:"classifiedItems"`
+	Characters      int       `json:"characters"`
+	TokenEstimate   int       `json:"tokenEstimate"`
+	Imported        bool      `json:"imported"`
+	CategoryCount   int       `json:"categoryCount"`
+	ClassifiedItems int       `json:"classifiedItems"`
+	Reply           string    `json:"reply,omitempty"`
+	ImportedAt      time.Time `json:"importedAt,omitempty"`
 }
 
 // ExportView is the Export screen's data.
@@ -50,8 +54,10 @@ type ExportView struct {
 	// Stale means redactions changed after a reply was imported; the export keeps the
 	// imported results until the user rebuilds it.
 	Stale bool `json:"stale"`
-	// Explanation is the round B prompt, present while categories are queued.
-	Explanation *ExplanationView `json:"explanation,omitempty"`
+	// ExplanationRounds are the imported round B prompts, in order; Explanation is the
+	// next one, present while categories are queued.
+	ExplanationRounds []ExplanationView `json:"explanationRounds"`
+	Explanation       *ExplanationView  `json:"explanation,omitempty"`
 }
 
 func (manager *Manager) promptOptions() prompt.Options {
@@ -116,6 +122,7 @@ func (manager *Manager) exportView(export *prompt.Export, stale bool) ExportView
 			TokenEstimate: approximateTokens(batch.Text)}
 		if imported, found := manager.exportState.imports[batch.Number]; found {
 			batchView.Imported = true
+			batchView.Reply, batchView.ImportedAt = imported.Reply, imported.ImportedAt
 			batchView.CategoryCount = len(imported.Categories)
 			for _, category := range imported.Categories {
 				batchView.ClassifiedItems += len(category.IDs)
@@ -123,6 +130,8 @@ func (manager *Manager) exportView(export *prompt.Export, stale bool) ExportView
 		}
 		view.Batches = append(view.Batches, batchView)
 	}
+	view.ExplanationRounds = append([]ExplanationView{},
+		manager.exportState.explanations.rounds...)
 	view.Explanation = manager.explanationView()
 	return view
 }
@@ -156,6 +165,10 @@ type PasteResult struct {
 	Export       ExportView                  `json:"export"`
 }
 
+// ErrRoundImported means a reply was pasted for an explanation round already imported.
+var ErrRoundImported = errors.New("this explanation round is already imported; " +
+	"queue the remaining categories for a new round")
+
 // ErrNoExport means a reply was pasted before any prompt existed.
 var ErrNoExport = errors.New("export a prompt before pasting a reply")
 
@@ -173,6 +186,10 @@ func (manager *Manager) Paste(request PasteRequest) (PasteResult, error) {
 	if round := manager.explanationRound(); round != 0 && request.Batch == round {
 		return manager.pasteExplanations(request.Text), nil
 	}
+	if request.Batch > len(export.Batches) && request.Batch <= len(export.Batches)+
+		len(manager.exportState.explanations.rounds) {
+		return PasteResult{}, ErrRoundImported
+	}
 	if request.Batch < 1 || request.Batch > len(export.Batches) {
 		return PasteResult{}, errors.New("no such batch")
 	}
@@ -185,7 +202,7 @@ func (manager *Manager) Paste(request PasteRequest) (PasteResult, error) {
 		batch.Number, export.Code, importedWord(result.Valid), len(parsed.Categories),
 		parsed.Classified, len(parsed.Problems))
 	if result.Valid {
-		manager.importBatch(batch.Number, parsed.Categories)
+		manager.importBatch(batch.Number, parsed.Categories, request.Text)
 		result.Imported = true
 	} else {
 		result.Repair = response.RepairPrompt(parsed, expectation)
@@ -197,7 +214,8 @@ func (manager *Manager) Paste(request PasteRequest) (PasteResult, error) {
 
 // importBatch stores a batch's categories. Importing a batch again replaces its
 // categories, and whatever was explained or queued for the old ones is dropped with them.
-func (manager *Manager) importBatch(batch int, categories []response.Category) {
+func (manager *Manager) importBatch(batch int, categories []response.Category,
+	reply string) {
 	state := &manager.exportState
 	if previous, found := state.imports[batch]; found {
 		state.explanations.forget(previous.Numbers)
@@ -207,7 +225,7 @@ func (manager *Manager) importBatch(batch int, categories []response.Category) {
 		numbers[index] = state.explanations.allocateNumber()
 	}
 	state.imports[batch] = BatchImport{Categories: categories, Numbers: numbers,
-		ImportedAt: time.Now()}
+		ImportedAt: time.Now(), Reply: reply}
 	manager.recordImports()
 }
 

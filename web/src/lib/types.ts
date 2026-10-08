@@ -208,6 +208,8 @@ export interface BatchView {
   imported: boolean;
   categoryCount: number;
   classifiedItems: number;
+  reply?: string;
+  importedAt?: string;
 }
 
 export interface ExportView {
@@ -218,6 +220,7 @@ export interface ExportView {
   unknownBytes: number;
   minimumItemBytes: number;
   stale: boolean;
+  explanationRounds: ExplanationView[];
   explanation?: ExplanationView;
 }
 
@@ -228,6 +231,11 @@ export interface ExplanationView {
   categories: number;
   characters: number;
   tokenEstimate: number;
+  imported: boolean;
+  reply?: string;
+  importedAt?: string;
+  explained: number;
+  stillQueued: number;
 }
 
 export interface ParsedExplanation {

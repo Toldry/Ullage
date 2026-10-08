@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  pruneSelection, restKey, roundsOf, selectedTotals, selectionState, toggleCategory,
+  pruneSelection, restKey, roundsOf, roundTitle, selectedTotals, selectionState,
+  toggleCategory,
 } from './results';
 import type { ExportView, ResultCategory } from './types';
 
@@ -42,18 +43,26 @@ describe('result selection', () => {
 });
 
 describe('rounds', () => {
-  it('appends the explanation prompt after the batches', () => {
+  it('lists imported explanation rounds and the pending one after the batches', () => {
+    const explanation = (round: number, imported: boolean) => ({ round, text: `r${round}`,
+      categories: 2, characters: 1, tokenEstimate: 1, imported, explained: 1,
+      stillQueued: imported ? 1 : 0, reply: imported ? 'reply' : undefined });
     const view = {
       code: 'ABCDEF', items: 1, representedBytes: 0, unknownBytes: 0, minimumItemBytes: 0,
       stale: false,
       batches: [{ number: 1, firstId: 1, lastId: 1, lines: 1, items: 1, text: 'a',
         characters: 1, tokenEstimate: 1, imported: true, categoryCount: 1,
         classifiedItems: 1 }],
-      explanation: { round: 2, text: 'b', categories: 3, characters: 1, tokenEstimate: 1 },
+      explanationRounds: [explanation(2, true), explanation(3, true)],
+      explanation: explanation(4, false),
     } satisfies ExportView;
     const rounds = roundsOf(view);
-    expect(rounds.map((round) => [round.number, round.kind])).toEqual([[1, 'batch'],
-      [2, 'explain']]);
-    expect(rounds[1].items).toBe(3);
+    // Step N is rounds[N - 1]: the stepper can never show "4 of 3" again.
+    expect(rounds.map((round) => [round.number, round.kind, round.imported])).toEqual([
+      [1, 'batch', true], [2, 'explain', true], [3, 'explain', true], [4, 'explain', false]]);
+    rounds.forEach((round, index) => expect(round.number).toBe(index + 1));
+    expect(rounds[1].reply).toBe('reply');
+    expect(roundTitle(rounds[0], 1)).toBe('Batch 1 of 1');
+    expect(roundTitle(rounds[3], 1)).toBe('Explanations · round 4');
   });
 });
