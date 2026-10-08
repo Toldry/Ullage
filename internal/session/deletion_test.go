@@ -43,6 +43,25 @@ func statuses(plan DeletionPlan) map[string]deletion.Status {
 	return result
 }
 
+// prepareAndWait starts verification and waits until every item has been checked.
+func prepareAndWait(t *testing.T, manager *Manager, keys []string) (DeletionPlan, error) {
+	t.Helper()
+	plan, err := manager.PrepareDeletion(keys)
+	if err != nil {
+		return plan, err
+	}
+	for deadline := time.Now().Add(10 * time.Second); plan.Verifying; {
+		if time.Now().After(deadline) {
+			t.Fatal("verification did not finish")
+		}
+		time.Sleep(5 * time.Millisecond)
+		if plan, err = manager.DeletionPlanProgress(); err != nil {
+			return plan, err
+		}
+	}
+	return plan, nil
+}
+
 func waitForDeletion(t *testing.T, manager *Manager) DeletionRun {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
@@ -69,7 +88,7 @@ func TestDeletionRefusesKeysOutsideTheResults(t *testing.T) {
 		"ai:3|id:" + lines["notes"],   // an item of another category
 		`ai:3|..\..\Windows`,          // text is never a path
 	}
-	plan, err := manager.PrepareDeletion(keys)
+	plan, err := prepareAndWait(t, manager, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +109,7 @@ func TestDeletionRefusesKeysOutsideTheResults(t *testing.T) {
 func TestPermanentDeletionNeedsTypedConfirmation(t *testing.T) {
 	manager, lines, root := explainedFixture(t)
 	keys := []string{"ai:3|id:" + lines["photos"], "ai:1|id:" + lines["notes"]}
-	plan, err := manager.PrepareDeletion(keys)
+	plan, err := prepareAndWait(t, manager, keys)
 	if err != nil || plan.Ready.Count != 2 || plan.Confirmation != "delete 2" {
 		t.Fatalf("plan = %+v %v", plan, err)
 	}
@@ -147,7 +166,7 @@ func TestPermanentDeletionNeedsTypedConfirmation(t *testing.T) {
 // deletion time, even though the plan said it was ready.
 func TestChangeAfterConfirmationBlocks(t *testing.T) {
 	manager, lines, root := explainedFixture(t)
-	plan, err := manager.PrepareDeletion([]string{"ai:3|id:" + lines["photos"]})
+	plan, err := prepareAndWait(t, manager, []string{"ai:3|id:" + lines["photos"]})
 	if err != nil || plan.Ready.Count != 1 {
 		t.Fatalf("plan = %+v %v", plan, err)
 	}
@@ -167,7 +186,7 @@ func TestChangeAfterConfirmationBlocks(t *testing.T) {
 		t.Fatalf("a changed item was deleted: %v", err)
 	}
 	// Preparing again shows it as changed.
-	again, _ := manager.PrepareDeletion([]string{"ai:3|id:" + lines["photos"]})
+	again, _ := prepareAndWait(t, manager, []string{"ai:3|id:" + lines["photos"]})
 	if again.Changed.Count != 1 || statuses(again)["ai:3|id:"+lines["photos"]] !=
 		deletion.StatusChanged {
 		t.Fatalf("plan after change = %+v", again)
@@ -180,12 +199,39 @@ func TestRecycleIsTheDefault(t *testing.T) {
 	if filepath.VolumeName(root) != filepath.VolumeName(os.Getenv("XDG_DATA_HOME")) {
 		t.Skip("trash and fixture on different volumes")
 	}
-	plan, _ := manager.PrepareDeletion([]string{"ai:3|id:" + lines["photos"]})
+	plan, _ := prepareAndWait(t, manager, []string{"ai:3|id:" + lines["photos"]})
 	if _, err := manager.ExecuteDeletion(ExecuteRequest{PlanID: plan.ID}); err != nil {
 		t.Fatal(err)
 	}
 	run := waitForDeletion(t, manager)
 	if run.Permanent || run.Removed.Count != 1 || run.Items[0].Status != deletion.StatusRecycled {
 		t.Fatalf("run = %+v", run)
+	}
+}
+
+func TestVerificationReportsProgress(t *testing.T) {
+	manager, lines, _ := explainedFixture(t)
+	keys := []string{"ai:3|id:" + lines["photos"], "ai:1|id:" + lines["notes"], "ai:9|id:1"}
+	started, err := manager.PrepareDeletion(keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if started.ToCheck != 2 || started.Refused.Count != 1 {
+		t.Fatalf("plan at start = %+v", started)
+	}
+	// Executing before the check finishes is refused (or the plan already finished).
+	if _, err := manager.ExecuteDeletion(ExecuteRequest{PlanID: started.ID}); err != nil &&
+		!errors.Is(err, ErrStillVerifying) {
+		t.Fatalf("execute while verifying: %v", err)
+	}
+	plan, err := prepareAndWait(t, manager, keys)
+	if err != nil || plan.Verifying || plan.Checked != 2 || plan.Ready.Count != 2 ||
+		plan.FilesRead == 0 || plan.Current != "" {
+		t.Fatalf("plan after = %+v %v", plan, err)
+	}
+	for _, item := range plan.Items {
+		if item.Status == StatusPending {
+			t.Fatalf("item left pending: %+v", item)
+		}
 	}
 }

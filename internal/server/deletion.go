@@ -74,3 +74,12 @@ func (server *Server) handleClearHistory(writer http.ResponseWriter, request *ht
 	}
 	writeJSON(writer, http.StatusOK, view)
 }
+
+func (server *Server) handleDeletionPlan(writer http.ResponseWriter, _ *http.Request) {
+	plan, err := server.manager.DeletionPlanProgress()
+	if err != nil {
+		writeJSONError(writer, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(writer, http.StatusOK, plan)
+}

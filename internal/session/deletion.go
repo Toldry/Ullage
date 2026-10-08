@@ -35,10 +35,19 @@ type deletionState struct {
 }
 
 type deletionPlan struct {
-	id      string
+	id string
+	// created is when verification finished; the plan's lifetime counts from there.
 	created time.Time
+	started time.Time
 	items   []DeletionItem
 	targets map[string]deletion.Target
+
+	verifying    bool
+	current      string
+	checked      int
+	checkedBytes int64
+	filesRead    int64
+	foldersRead  int64
 }
 
 // DeletionItem is one row of the confirmation and progress screens.
@@ -73,11 +82,23 @@ type DeletionPlan struct {
 	Refused Tally          `json:"refused"`
 	// Confirmation is what the user types to delete permanently.
 	Confirmation string `json:"confirmation"`
+
+	// Verification progress: the items are checked one after another in the background.
+	Verifying      bool    `json:"verifying"`
+	ToCheck        int     `json:"toCheck"`
+	Checked        int     `json:"checked"`
+	ToCheckBytes   int64   `json:"toCheckBytes"`
+	CheckedBytes   int64   `json:"checkedBytes"`
+	FilesRead      int64   `json:"filesRead"`
+	FoldersRead    int64   `json:"foldersRead"`
+	Current        string  `json:"current,omitempty"`
+	ElapsedSeconds float64 `json:"elapsedSeconds"`
 }
 
 // Errors of the deletion API.
 var (
 	ErrDeletionRunning = errors.New("a deletion is in progress")
+	ErrStillVerifying  = errors.New("the items are still being checked")
 	ErrPlanExpired     = errors.New("the confirmation is out of date; review the items again")
 	ErrConfirmation    = errors.New("type the confirmation exactly to delete permanently")
 	ErrNothingReady    = errors.New("no item is ready to delete")
@@ -203,61 +224,123 @@ func (manager *Manager) guard() *deletion.Guard {
 		Locations: locations, Canonical: manager.environment.Canonical}
 }
 
-// PrepareDeletion resolves a selection and re-verifies every item against the disk. The
-// disk work runs without the session lock; the scan tree it reads never changes.
+// StatusPending marks an item that has not been checked yet.
+const StatusPending deletion.Status = "pending"
+
+// PrepareDeletion resolves a selection and starts re-verifying every item against the
+// disk in the background; DeletionPlanProgress reports how far it got. The disk work runs
+// without the session lock; the scan tree it reads never changes.
 func (manager *Manager) PrepareDeletion(keys []string) (DeletionPlan, error) {
 	manager.lock.Lock()
+	defer manager.lock.Unlock()
 	if manager.completed == nil {
-		manager.lock.Unlock()
 		return DeletionPlan{}, errors.New("no finished scan yet")
 	}
 	if manager.deletion.running() {
-		manager.lock.Unlock()
 		return DeletionPlan{}, ErrDeletionRunning
 	}
 	items, targets, err := manager.resolveSelection(keys)
-	guard := manager.guard()
-	profile := manager.CurrentProfile()
-	manager.lock.Unlock()
 	if err != nil {
 		return DeletionPlan{}, err
-	}
-
-	for index := range items {
-		target, found := targets[items[index].Key]
-		if !found {
-			continue
-		}
-		check := guard.Verify(target)
-		items[index].Status, items[index].Reason = check.Status, check.Reason
-		if check.Status == deletion.StatusChanged && check.Now.LogicalBytes > 0 {
-			items[index].NowBytes = check.Now.LogicalBytes
-		}
-		items[index].Path = overview.DisplayPath(check.Path, profile)
-		if target.Kind == deletion.KindLoose {
-			items[index].Path += "/*"
-		}
 	}
 	id, err := randomID()
 	if err != nil {
 		return DeletionPlan{}, err
 	}
-	plan := &deletionPlan{id: id, created: time.Now(), items: items, targets: targets}
+	tree := manager.completed.Result.Tree
+	profile := manager.CurrentProfile()
+	for index := range items {
+		target, found := targets[items[index].Key]
+		if !found {
+			continue
+		}
+		items[index].Status = StatusPending
+		items[index].Path = overview.DisplayPath(tree.Path(target.Node), profile)
+		if target.Kind == deletion.KindLoose {
+			items[index].Path += "/*"
+		}
+	}
+	plan := &deletionPlan{id: id, started: time.Now(), items: items, targets: targets,
+		verifying: true}
+	manager.deletion.plan = plan
+	go manager.verifyPlan(plan, manager.guard())
+	return planView(plan), nil
+}
 
+// verifyPlan checks the plan's items one by one, publishing each result as it comes.
+// A newer plan supersedes this one; its results are then simply dropped.
+func (manager *Manager) verifyPlan(plan *deletionPlan, guard *deletion.Guard) {
+	for index := range plan.items {
+		manager.lock.Lock()
+		if manager.deletion.plan != plan {
+			manager.lock.Unlock()
+			return
+		}
+		item := plan.items[index]
+		target, found := plan.targets[item.Key]
+		if found {
+			plan.current = item.Path
+		}
+		manager.lock.Unlock()
+		if !found {
+			continue
+		}
+
+		check := guard.Verify(target)
+
+		manager.lock.Lock()
+		if manager.deletion.plan != plan {
+			manager.lock.Unlock()
+			return
+		}
+		plan.items[index].Status, plan.items[index].Reason = check.Status, check.Reason
+		if check.Status == deletion.StatusChanged && check.Now.LogicalBytes > 0 {
+			plan.items[index].NowBytes = check.Now.LogicalBytes
+		}
+		plan.checked++
+		plan.checkedBytes += item.Bytes
+		plan.filesRead += check.Now.Files
+		plan.foldersRead += check.Now.Directories
+		manager.lock.Unlock()
+	}
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
-	manager.deletion.plan = plan
+	if manager.deletion.plan != plan {
+		return
+	}
+	plan.verifying, plan.current, plan.created = false, "", time.Now()
 	view := planView(plan)
 	manager.logf("delete", "verified %d: %d ready, %d changed, %d missing, %d refused",
-		len(items), view.Ready.Count, view.Changed.Count, view.Missing.Count,
+		len(plan.items), view.Ready.Count, view.Changed.Count, view.Missing.Count,
 		view.Refused.Count)
-	return view, nil
+}
+
+// DeletionPlanProgress returns the current plan, while or after it is verified.
+func (manager *Manager) DeletionPlanProgress() (DeletionPlan, error) {
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
+	if manager.deletion.plan == nil {
+		return DeletionPlan{}, ErrPlanExpired
+	}
+	return planView(manager.deletion.plan), nil
 }
 
 func planView(plan *deletionPlan) DeletionPlan {
-	view := DeletionPlan{ID: plan.id, Items: plan.items}
+	view := DeletionPlan{ID: plan.id, Items: append([]DeletionItem{}, plan.items...),
+		Verifying: plan.verifying, Checked: plan.checked, CheckedBytes: plan.checkedBytes,
+		FilesRead: plan.filesRead, FoldersRead: plan.foldersRead, Current: plan.current}
+	ended := plan.created
+	if plan.verifying {
+		ended = time.Now()
+	}
+	view.ElapsedSeconds = ended.Sub(plan.started).Seconds()
 	for _, item := range plan.items {
+		if item.Status != StatusRejected {
+			view.ToCheck++
+			view.ToCheckBytes += item.Bytes
+		}
 		switch item.Status {
+		case StatusPending:
 		case deletion.StatusReady:
 			view.Ready.add(item.Bytes)
 		case deletion.StatusChanged:
@@ -303,6 +386,8 @@ func (manager *Manager) ExecuteDeletion(request ExecuteRequest) (DeletionRun, er
 	switch {
 	case manager.deletion.running():
 		return DeletionRun{}, ErrDeletionRunning
+	case plan != nil && plan.id == request.PlanID && plan.verifying:
+		return DeletionRun{}, ErrStillVerifying
 	case plan == nil || plan.id != request.PlanID ||
 		time.Since(plan.created) > planLifetime:
 		return DeletionRun{}, ErrPlanExpired
@@ -403,6 +488,9 @@ type DeletionRun struct {
 	Failed    Tally          `json:"failed"`
 	Skipped   Tally          `json:"skipped"`
 	Pending   Tally          `json:"pending"`
+	// Current is the item being verified and deleted right now.
+	Current        string  `json:"current,omitempty"`
+	ElapsedSeconds float64 `json:"elapsedSeconds"`
 }
 
 // runView describes the current or last run. Callers hold manager.lock.
@@ -414,6 +502,14 @@ func (manager *Manager) runView() DeletionRun {
 	state := run.State()
 	view := DeletionRun{Permanent: state.Permanent, Total: state.Total, Done: state.Done,
 		Stopping: state.Stopping, Finished: state.Finished && manager.deletion.recorded}
+	ended := state.Ended
+	if ended.IsZero() {
+		ended = time.Now()
+	}
+	view.ElapsedSeconds = ended.Sub(state.Started).Seconds()
+	if !state.Finished && state.Done < len(manager.deletion.runItems) {
+		view.Current = manager.deletion.runItems[state.Done].Path
+	}
 	for index, item := range manager.deletion.runItems {
 		if index >= len(state.Outcomes) {
 			item.Status, item.Reason = deletion.StatusReady, ""

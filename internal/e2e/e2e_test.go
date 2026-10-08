@@ -195,11 +195,19 @@ func TestScanClassifyExplainAndRecycle(t *testing.T) {
 	key := category.Key + "|" + category.Items[0].Key
 
 	var plan struct {
-		ID    string
-		Ready struct{ Count int }
+		ID        string
+		Verifying bool
+		Ready     struct{ Count int }
 	}
 	api.call(http.MethodPost, "/api/delete/prepare", map[string]any{
 		"keys": []string{key, "ai:2|" + category.Items[0].Key}}, &plan)
+	for deadline := time.Now().Add(30 * time.Second); plan.Verifying; {
+		if time.Now().After(deadline) {
+			t.Fatal("verification did not finish")
+		}
+		time.Sleep(20 * time.Millisecond)
+		api.call(http.MethodGet, "/api/delete/plan", nil, &plan)
+	}
 	if plan.Ready.Count != 1 {
 		t.Fatalf("plan = %+v", plan)
 	}

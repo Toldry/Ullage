@@ -9,7 +9,7 @@ import { OverviewScreen } from './screens/OverviewScreen';
 import { ExportScreen } from './screens/ExportScreen';
 import { PasteScreen } from './screens/PasteScreen';
 import { ResultsScreen } from './screens/ResultsScreen';
-import { DeleteDialog } from './screens/DeleteDialog';
+import { DeleteScreen } from './screens/DeleteScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
 import { pruneSelection } from './lib/results';
 import { RedactScreen } from './screens/RedactScreen';
@@ -148,7 +148,6 @@ export function App() {
 
   const navigate = useCallback((target: Screen) => {
     if (target === 'scan' && screen === 'scanning') return;
-    if (screen === 'delete') return;
     const needsScan: Screen[] = ['overview', 'redact', 'export', 'paste', 'results', 'delete'];
     if (needsScan.includes(target) && !overview) return;
     if (target === 'delete' && deletionSelection.size === 0) return;
@@ -296,18 +295,17 @@ export function App() {
               onGoExport={() => setScreen('export')}
               onGoResults={() => setScreen('results')} />
           )}
-          {(screen === 'results' || screen === 'delete') && (
+          {screen === 'results' && (
             <ResultsScreen guard={guard} selection={deletionSelection}
               onSelectionChange={setDeletionSelection} onResultsLoaded={onResultsLoaded}
               onGoExport={(round) => { setBatch(round); setScreen('export'); }}
               onRescan={() => { setError(''); setScreen('scan'); }}
-              onReviewDeletion={() => setScreen('delete')} refreshToken={resultsRefresh}
-              inactive={screen === 'delete'} />
+              onReviewDeletion={() => setScreen('delete')} refreshToken={resultsRefresh} />
           )}
           {screen === 'delete' && (
-            <DeleteDialog guard={guard} keys={[...deletionSelection]}
+            <DeleteScreen guard={guard} keys={[...deletionSelection]}
               volumeName={statusVolume?.name ?? 'this drive'}
-              onClose={(changed) => {
+              onDone={(changed) => {
                 setScreen('results');
                 if (changed) setResultsRefresh((previous) => previous + 1);
               }} />

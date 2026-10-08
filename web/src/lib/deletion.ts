@@ -5,6 +5,7 @@ export const deletionApi = {
   prepare: (keys: string[]) => api.post<DeletionPlan>('/api/delete/prepare', { keys }),
   execute: (planId: string, permanent: boolean, confirmation: string) =>
     api.post<DeletionRun>('/api/delete/execute', { planId, permanent, confirmation }),
+  plan: () => api.get<DeletionPlan>('/api/delete/plan'),
   progress: () => api.get<DeletionRun>('/api/delete/progress'),
   stop: () => api.post<DeletionRun>('/api/delete/stop'),
 };
@@ -12,6 +13,7 @@ export const deletionApi = {
 export type Tone = 'ok' | 'bad' | 'warn' | 'none';
 
 export const statusLabels: Record<DeletionStatus, { label: string; tone: Tone }> = {
+  pending: { label: 'Waiting', tone: 'none' },
   ready: { label: 'Ready', tone: 'ok' },
   changed: { label: 'Changed since scan', tone: 'bad' },
   missing: { label: 'Missing', tone: 'none' },

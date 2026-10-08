@@ -144,6 +144,7 @@ func (server *Server) apiRoutes() map[string]route {
 			maximumBodyBytes: maximumPasteBytes},
 		"/api/delete/execute":  {method: http.MethodPost, handler: server.handleExecuteDeletion},
 		"/api/delete/progress": {method: http.MethodGet, handler: server.handleDeletionProgress},
+		"/api/delete/plan":     {method: http.MethodGet, handler: server.handleDeletionPlan},
 		"/api/delete/stop":     {method: http.MethodPost, handler: server.handleStopDeletion},
 		"/api/history":         {method: http.MethodGet, handler: server.handleHistory},
 		"/api/history/clear":   {method: http.MethodPost, handler: server.handleClearHistory},

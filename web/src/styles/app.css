@@ -2302,55 +2302,12 @@ h1 {
   outline: none;
 }
 
-/* Delete dialog (step 7) */
-.dialog-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: var(--scrim);
-}
+/* Delete (step 7) */
 
-.dialog {
-  width: 920px;
-  max-width: 100%;
-  max-height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg);
-  border: 1px solid var(--line2);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-  overflow: hidden;
-}
 
-.dialog-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 16px 18px 14px;
-  border-bottom: 1px solid var(--line);
-}
 
-.dialog-heading {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
 
-.dialog-title {
-  font-size: 18px;
-  font-weight: 600;
-}
 
-.kbd-button {
-  cursor: pointer;
-  background: none;
-}
 
 .tally-row {
   display: grid;
@@ -2417,13 +2374,6 @@ h1 {
   color: var(--warn);
 }
 
-.run-progress {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--line);
-}
 
 .dialog-table-head,
 .dialog-row {
@@ -2482,13 +2432,6 @@ h1 {
   align-items: flex-end;
 }
 
-.dialog-options {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 18px;
-  border-top: 1px solid var(--line);
-}
 
 .option-pair {
   display: flex;
@@ -2570,14 +2513,6 @@ h1 {
   outline: none;
 }
 
-.dialog-footer {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 18px;
-  border-top: 1px solid var(--line);
-  background: var(--bg2);
-}
 
 .grow {
   flex: 1;
@@ -2599,9 +2534,6 @@ h1 {
   cursor: default;
 }
 
-.dialog:focus {
-  outline: none;
-}
 
 .cloud-badge {
   flex: none;
@@ -2689,4 +2621,40 @@ h1 {
   flex: none;
   width: auto;
   margin-right: 0;
+}
+
+.delete-items {
+  overflow: hidden;
+}
+
+.delete-items .dialog-rows {
+  max-height: 420px;
+}
+
+.delete-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+}
+
+.tally-row.panel {
+  border-bottom: 1px solid var(--line);
+}
+
+/* The item being checked or deleted right now. */
+.dialog-row.row-active {
+  background: var(--bg3);
+  box-shadow: inset 2px 0 0 var(--fg2);
+}
+
+.status-active {
+  background: var(--fg2);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+  }
 }

@@ -355,7 +355,7 @@ export interface ResultsView {
 
 // Deletion (internal/session/deletion.go, internal/deletion)
 export type DeletionStatus =
-  | 'ready' | 'changed' | 'missing' | 'protected' | 'rejected'
+  | 'pending' | 'ready' | 'changed' | 'missing' | 'protected' | 'rejected'
   | 'recycled' | 'deleted' | 'failed' | 'partial' | 'skipped';
 
 export interface DeletionItem {
@@ -384,6 +384,15 @@ export interface DeletionPlan {
   missing: Tally;
   refused: Tally;
   confirmation: string;
+  verifying: boolean;
+  toCheck: number;
+  checked: number;
+  toCheckBytes: number;
+  checkedBytes: number;
+  filesRead: number;
+  foldersRead: number;
+  current?: string;
+  elapsedSeconds: number;
 }
 
 export interface DeletionRun {
@@ -397,6 +406,8 @@ export interface DeletionRun {
   failed: Tally;
   skipped: Tally;
   pending: Tally;
+  current?: string;
+  elapsedSeconds: number;
 }
 
 // History (internal/history, internal/session/history.go)

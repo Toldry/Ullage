@@ -19,8 +19,6 @@ interface Props {
   onReviewDeletion: () => void;
   // Changes after a deletion, so the list is loaded again.
   refreshToken: number;
-  // True while the deletion dialog is open over this screen; it owns the keyboard then.
-  inactive: boolean;
 }
 
 type SourceFilter = 'all' | 'recipe' | 'ai';
@@ -28,7 +26,7 @@ type ConfidenceFilter = 'any' | 'recipe' | 'high' | 'med' | 'low';
 type RegenerableFilter = 'any' | 'yes' | 'partially' | 'no';
 
 export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLoaded,
-  onGoExport, onRescan, onReviewDeletion, refreshToken, inactive }: Props) {
+  onGoExport, onRescan, onReviewDeletion, refreshToken }: Props) {
   const [view, setView] = useState<ResultsView | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [focused, setFocused] = useState(0);
@@ -79,7 +77,7 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
-      if (inactive || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
       if (event.ctrlKey || event.metaKey || event.altKey || allRows.length === 0) return;
       const current = allRows[Math.min(focused, allRows.length - 1)];
       if (event.key === 'j') setFocused(Math.min(focused + 1, allRows.length - 1));
