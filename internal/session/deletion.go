@@ -270,9 +270,14 @@ func (manager *Manager) PrepareDeletion(keys []string) (DeletionPlan, error) {
 	return planView(plan), nil
 }
 
+// beforeVerifying runs at the start of each verification; tests replace it to hold the
+// check, so what happens while it runs is tested without depending on timing.
+var beforeVerifying = func() {}
+
 // verifyPlan checks the plan's items one by one, publishing each result as it comes.
 // A newer plan supersedes this one; its results are then simply dropped.
 func (manager *Manager) verifyPlan(plan *deletionPlan, guard *deletion.Guard) {
+	beforeVerifying()
 	for index := range plan.items {
 		manager.lock.Lock()
 		if manager.deletion.plan != plan {

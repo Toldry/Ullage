@@ -199,19 +199,23 @@ func TestRecycleIsTheDefault(t *testing.T) {
 
 func TestVerificationReportsProgress(t *testing.T) {
 	manager, lines, _ := explainedFixture(t)
+	release := make(chan struct{})
+	beforeVerifying = func() { <-release }
+	t.Cleanup(func() { beforeVerifying = func() {} })
 	keys := []string{"ai:3|id:" + lines["photos"], "ai:1|id:" + lines["notes"], "ai:9|id:1"}
 	started, err := manager.PrepareDeletion(keys)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if started.ToCheck != 2 || started.Refused.Count != 1 {
+	if started.ToCheck != 2 || started.Refused.Count != 1 || !started.Verifying {
 		t.Fatalf("plan at start = %+v", started)
 	}
-	// Executing before the check finishes is refused (or the plan already finished).
-	if _, err := manager.ExecuteDeletion(ExecuteRequest{PlanID: started.ID}); err != nil &&
-		!errors.Is(err, ErrStillVerifying) {
+	// Executing before the check finishes is refused.
+	if _, err := manager.ExecuteDeletion(ExecuteRequest{PlanID: started.ID}); !errors.Is(err,
+		ErrStillVerifying) {
 		t.Fatalf("execute while verifying: %v", err)
 	}
+	close(release)
 	plan, err := prepareAndWait(t, manager, keys)
 	if err != nil || plan.Verifying || plan.Checked != 2 || plan.Ready.Count != 2 ||
 		plan.FilesRead == 0 || plan.Current != "" {
