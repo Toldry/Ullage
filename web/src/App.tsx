@@ -36,6 +36,9 @@ export function App() {
   const [volumes, setVolumes] = useState<Volume[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<Progress | null>(null);
+  // A scan keeps running while the user looks at other screens (the rules, the history),
+  // so whether one runs is tracked apart from which screen is shown.
+  const [scanRunning, setScanRunning] = useState(false);
   const [log, setLog] = useState<LogLine[]>([]);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [error, setError] = useState('');
@@ -67,11 +70,14 @@ export function App() {
     }
   }, []);
 
+  // loadOverview shows the Overview, unless the user moved on to a screen other than the
+  // scan's while it finished.
   const loadOverview = useCallback(async () => {
     const loaded = await guard(api.get<Overview>('/api/overview'));
     if (loaded) {
       setOverview(loaded);
-      setScreen('overview');
+      setScreen((current) =>
+        current === 'scan' || current === 'scanning' ? 'overview' : current);
     }
   }, [guard]);
 
@@ -91,7 +97,10 @@ export function App() {
       const systemVolume = loadedVolumes.find((volume) => /^c:/i.test(volume.name)) ??
         loadedVolumes[0];
       if (systemVolume) setSelected(new Set([systemVolume.root]));
-      if (loadedStatus.state === 'running') setScreen('scanning');
+      if (loadedStatus.state === 'running') {
+        setScanRunning(true);
+        setScreen('scanning');
+      }
       else if (loadedStatus.hasOverview) await loadOverview();
     })();
     const heartbeat = window.setInterval(
@@ -99,9 +108,10 @@ export function App() {
     return () => window.clearInterval(heartbeat);
   }, [guard, loadOverview]);
 
-  // While scanning, progress arrives over Server-Sent Events (cookie-authenticated).
+  // While scanning, progress arrives over Server-Sent Events (cookie-authenticated). The
+  // stream stays open on every screen, so the progress is current when the user returns.
   useEffect(() => {
-    if (screen !== 'scanning') return;
+    if (!scanRunning) return;
     const source = new EventSource('/api/scan/stream');
     source.addEventListener('progress', (event) => {
       const update = JSON.parse((event as MessageEvent<string>).data) as Progress;
@@ -109,14 +119,17 @@ export function App() {
       if (update.log.length) setLog((previous) => [...previous, ...update.log].slice(-400));
       if (update.state === 'finished') {
         source.close();
+        setScanRunning(false);
         setStatus((previous) => previous && { ...previous, sessionCode: update.sessionCode,
           hasOverview: true, firstRun: false });
         void loadOverview();
       } else if (update.state === 'cancelled' || update.state === 'failed') {
         source.close();
+        setScanRunning(false);
         setError(update.state === 'failed' ? `Scan failed: ${update.failure ?? ''}` :
           'Scan cancelled. Nothing was changed.');
-        setScreen(overview ? 'overview' : 'scan');
+        setScreen((current) => current === 'scanning'
+          ? (overview ? 'overview' : 'scan') : current);
       }
     });
     source.onerror = () => {
@@ -124,7 +137,7 @@ export function App() {
       void guard(api.get<Status>('/api/status'));
     };
     return () => source.close();
-  }, [screen, guard, loadOverview, overview]);
+  }, [scanRunning, guard, loadOverview, overview]);
 
   const startScan = useCallback(async (selection: ScanSelection) => {
     setError('');
@@ -134,6 +147,7 @@ export function App() {
     if (started) {
       setProgress({ ...started, log: [] });
       setStatus((previous) => previous && { ...previous, sessionCode: started.sessionCode });
+      setScanRunning(true);
       setScreen('scanning');
     }
   }, [guard]);
@@ -153,14 +167,20 @@ export function App() {
 
   const reachedStep = overview ? 6 : 1;
 
+  // Step 1 is the running scan's progress while one runs, and the start form otherwise.
+  const scanScreen: Screen = scanRunning ? 'scanning' : 'scan';
+
   const navigate = useCallback((target: Screen) => {
-    if (target === 'scan' && screen === 'scanning') return;
+    if (target === 'scan' && scanRunning) {
+      setScreen('scanning');
+      return;
+    }
     const needsScan: Screen[] = ['overview', 'redact', 'export', 'paste', 'delete'];
     if (needsScan.includes(target) && !overview) return;
     // Opening step 6 from elsewhere shows the category list, never a stale confirmation.
     if (target === 'delete' && screen !== 'delete') setDeletePhase('select');
     if ([...needsScan, 'scan', 'rules', 'history'].includes(target)) setScreen(target);
-  }, [screen, overview]);
+  }, [screen, overview, scanRunning]);
 
   const startFromKeyboard = useCallback(() => {
     const roots = volumes.filter((volume) => selected.has(volume.root)).map((v) => v.root);
@@ -221,7 +241,7 @@ export function App() {
     export: 'Export prompt', paste: 'Paste response', delete: 'Delete',
     rules: 'Redaction rules', history: 'History',
   };
-  const scanMeta = screen === 'scanning' && progress?.expectedBytes
+  const scanMeta = scanRunning && progress?.expectedBytes
     ? `${Math.floor(Math.min(0.99, progress.allocatedBytes / progress.expectedBytes) * 100)}%`
     : overview?.roots.map((root) => root.display).join(' ') ?? '';
 
@@ -282,7 +302,7 @@ export function App() {
             <OverviewScreen
               overview={overview}
               canRelaunch={status.canRelaunch}
-              onRescan={() => { setError(''); setScreen('scan'); }}
+              onRescan={() => { setError(''); setScreen(scanScreen); }}
               onRelaunch={relaunch}
               onReview={() => setScreen('redact')}
             />
@@ -307,7 +327,7 @@ export function App() {
             <ResultsScreen guard={guard} selection={deletionSelection}
               onSelectionChange={setDeletionSelection} onResultsLoaded={onResultsLoaded}
               onGoPaste={() => setScreen('paste')}
-              onRescan={() => { setError(''); setScreen('scan'); }}
+              onRescan={() => { setError(''); setScreen(scanScreen); }}
               onReviewDeletion={() => setDeletePhase('confirm')} refreshToken={resultsRefresh} />
           )}
           {screen === 'delete' && deletePhase === 'confirm' && (
@@ -322,7 +342,7 @@ export function App() {
       </div>
       <StatusBar
         volumeSummary={statusVolume}
-        files={screen === 'scanning' ? progress?.files : overview?.files}
+        files={scanRunning ? progress?.files : overview?.files}
         elevated={status.elevated}
       />
     </div>
