@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { Kbd } from '../components/Controls';
 import { copyText } from '../lib/clipboard';
 import {
-  categoryWarnings, deletionApi, errorLog, retryableStatuses, splitPath, statusLabels, type Tone,
+  categoryWarnings, deletionApi, errorLog, leftInPlaceCount, outcomeLabel, retryableStatuses,
+  splitPath, statusLabels, type Tone,
 } from '../lib/deletion';
 import { formatBytes, formatCount, formatDuration, pluralize } from '../lib/format';
 import type { DeletionItem, DeletionPlan, DeletionRun, Tally } from '../lib/types';
@@ -160,7 +161,7 @@ export function DeleteScreen({ guard, keys, volumeName, onDone }: Props) {
           { label: run.permanent ? 'Deleted' : 'Moved to Recycle Bin', tone: 'ok',
             tally: run.removed },
           { label: 'Failed', tone: 'bad', tally: run.failed },
-          { label: 'Skipped', tone: 'none', tally: {
+          { label: 'Not deleted · left in place', tone: 'warn', tally: {
             count: run.skipped.count + (plan ? plan.items.length - plan.ready.count : 0),
             bytes: run.skipped.bytes + (plan ? sumBlocked(plan) : 0) } },
         ]} />
@@ -176,6 +177,7 @@ export function DeleteScreen({ guard, keys, volumeName, onDone }: Props) {
           {items.length === 0 && <div class="dialog-row muted small">Preparing…</div>}
           {items.map((item) => (
             <ItemRow key={item.key} item={item}
+              afterRun={phase === 'deleting' || phase === 'finished'}
               active={(phase === 'checking' && item.path === plan?.current) ||
                 (phase === 'deleting' && item.path === run?.current)} />
           ))}
@@ -279,6 +281,12 @@ export function DeleteScreen({ guard, keys, volumeName, onDone }: Props) {
               }}>Copy error log</button>
             )}
             <span class="small muted">
+              {leftInPlaceCount(items) > 0 && !note && (
+                <span class="warn-text">
+                  {pluralize(leftInPlaceCount(items), 'item')} {leftInPlaceCount(items) === 1
+                    ? 'was' : 'were'} left untouched. Scan again to delete what changed.{' '}
+                </span>
+              )}
               {note || (run.permanent ? 'Space is freed now. Rescan to update the overview.'
                 : `Free space on ${volumeName} changes when you empty the Recycle Bin ` +
                   `(${formatBytes(run.removed.bytes)} waiting).`)}
@@ -435,8 +443,9 @@ function TallyRow(props: { cells: { label: string; tone: Tone; tally: Tally }[] 
   );
 }
 
-function ItemRow({ item, active }: { item: DeletionItem; active: boolean }) {
-  const { label, tone } = statusLabels[item.status];
+function ItemRow({ item, active, afterRun }: { item: DeletionItem; active: boolean;
+  afterRun: boolean }) {
+  const { label, tone } = afterRun ? outcomeLabel(item.status) : statusLabels[item.status];
   const [directory, name] = splitPath(item.path || item.key);
   return (
     <div class={`dialog-row${tone === 'bad' ? ' row-bad' : ''}${active ? ' row-active' : ''}`}>

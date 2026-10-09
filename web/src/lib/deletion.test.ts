@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { categoryWarnings, errorLog, splitPath } from './deletion';
+import {
+  categoryWarnings, errorLog, leftInPlaceCount, outcomeLabel, splitPath,
+} from './deletion';
 import type { DeletionItem } from './types';
 
 describe('deletion helpers', () => {
@@ -30,5 +32,16 @@ describe('deletion helpers', () => {
       item('c', 'recipe:ollama-models', 'changed', 'pull again'),
       item('d', 'ai:1', 'ready'),
     ])).toEqual([{ name: 'recipe:rustup-toolchains', warning: 'rustup still lists them' }]);
+  });
+
+  it('says plainly after a run that a blocked item was not deleted', () => {
+    for (const status of ['changed', 'protected', 'rejected', 'skipped'] as const) {
+      expect(outcomeLabel(status).label).toMatch(/^Not deleted/);
+    }
+    expect(outcomeLabel('recycled').label).toBe('Moved to bin');
+    const item = (status: DeletionItem['status']): DeletionItem => ({ key: status,
+      category: 'ai:1', categoryName: 'x', path: `~/${status}`, kind: 'folder', bytes: 1,
+      status });
+    expect(leftInPlaceCount([item('changed'), item('recycled'), item('skipped')])).toBe(2);
   });
 });

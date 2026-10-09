@@ -26,6 +26,28 @@ export const statusLabels: Record<DeletionStatus, { label: string; tone: Tone }>
   skipped: { label: 'Skipped', tone: 'none' },
 };
 
+// Statuses that mean the item is still on disk because Ullage left it alone on purpose.
+const leftInPlace: DeletionStatus[] = ['changed', 'protected', 'rejected', 'skipped'];
+
+// outcomeLabel is the row label once a run has finished (or is running): it leads with
+// what happened to the item, so a blocked item never reads as if it might be gone.
+export function outcomeLabel(status: DeletionStatus): { label: string; tone: Tone } {
+  switch (status) {
+    case 'changed': return { label: 'Not deleted · changed', tone: 'warn' };
+    case 'protected': return { label: 'Not deleted · protected', tone: 'warn' };
+    case 'rejected': return { label: 'Not deleted · refused', tone: 'warn' };
+    case 'skipped': return { label: 'Not deleted · stopped', tone: 'none' };
+    case 'missing': return { label: 'Already gone', tone: 'none' };
+    case 'failed': return { label: 'Failed · still there', tone: 'bad' };
+    default: return statusLabels[status];
+  }
+}
+
+// leftInPlaceCount counts items Ullage deliberately did not touch.
+export function leftInPlaceCount(items: DeletionItem[]): number {
+  return items.filter((item) => leftInPlace.includes(item.status)).length;
+}
+
 // splitPath separates the folder (shown dimmed) from the name, keeping "/*" with the name.
 export function splitPath(path: string): [string, string] {
   const loose = path.endsWith('/*');
