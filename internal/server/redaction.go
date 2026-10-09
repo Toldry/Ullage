@@ -146,3 +146,16 @@ func (server *Server) handleResetRules(writer http.ResponseWriter, request *http
 	}
 	writeJSON(writer, http.StatusOK, map[string]string{"movedTo": aside})
 }
+
+func (server *Server) handleRuleHits(writer http.ResponseWriter, request *http.Request) {
+	hits, err := server.manager.RuleHits(request.URL.Query().Get("id"))
+	if errors.Is(err, session.ErrNoSuchRule) {
+		writeJSONError(writer, http.StatusNotFound, err.Error())
+		return
+	}
+	if err != nil {
+		writeRedactionError(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, hits)
+}

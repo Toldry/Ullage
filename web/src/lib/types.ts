@@ -165,7 +165,11 @@ export interface RedactionChildren {
 
 export interface RedactionDetail {
   item: RedactionItem;
-  preview: RedactionItem[];
+  // The item's lines in the prompt after redaction, largest first, without IDs.
+  lines: string[];
+  lineCount: number;
+  // The line of a larger item that includes this one, when it has none of its own.
+  coveredBy?: string;
 }
 
 export type RuleType = 'exact' | 'subtree' | 'glob' | 'name';
@@ -312,6 +316,8 @@ export interface ResultCategory {
   cloudSyncItems: number;
   notLocalBytes: number;
   selectable: boolean;
+  tooRecentItems?: number;
+  tooRecentBytes?: number;
 }
 
 export interface ResultsView {
@@ -323,10 +329,12 @@ export interface ResultsView {
     keptByAiBytes: number;
     unclassifiedBytes: number;
     reclaimableBytes: number;
+    tooRecentBytes: number;
   };
   code: string;
   batchCount: number;
   batchesImported: number;
+  unchangedDays: number;
   minimumItemBytes: number;
 }
 
@@ -348,6 +356,8 @@ export interface DeletionItem {
   cloudSync?: boolean;
   // The recipe's brute-force warning: what can break when the managed steps are skipped.
   warning?: string;
+  // Read again by a re-scan; bytes is then its size at the re-scan.
+  rescanned?: boolean;
 }
 
 export interface Tally {

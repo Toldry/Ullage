@@ -27,6 +27,8 @@ export function DeleteScreen({ guard, keys, volumeName, onDone }: Props) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [selectionKeys, setSelectionKeys] = useState<string[] | null>(null);
+  // Set together with selectionKeys when the plan should re-scan changed items.
+  const rescan = useRef(false);
   const changed = useRef(false);
   const primaryButton = useRef<HTMLButtonElement>(null);
 
@@ -49,7 +51,9 @@ export function DeleteScreen({ guard, keys, volumeName, onDone }: Props) {
     setPlan(null);
     setPermanent(false);
     setTyped('');
-    void guard(deletionApi.prepare(selectionKeys)).then((loaded) => loaded && setPlan(loaded));
+    void guard(deletionApi.prepare(selectionKeys, rescan.current))
+      .then((loaded) => loaded && setPlan(loaded));
+    rescan.current = false;
   }, [guard, selectionKeys]);
 
   // The server checks items in the background; poll until every one has a verdict.
@@ -115,6 +119,20 @@ export function DeleteScreen({ guard, keys, volumeName, onDone }: Props) {
   const items = run ? run.items.concat(plan?.items.filter((item) => item.status !== 'ready')
     ?? []) : plan?.items ?? [];
   const count = selectionKeys?.length ?? keys.length;
+  const changedKeys = items.filter((item) => item.status === 'changed')
+    .map((item) => item.key);
+  const rescanChanged = () => {
+    rescan.current = true;
+    setRun(null);
+    setNote('');
+    setSelectionKeys(changedKeys);
+  };
+  const rescanButton = changedKeys.length > 0 && (
+    <button type="button" class="button" onClick={rescanChanged}
+      title="Read these items again and review them at their current size">
+      Re-scan {pluralize(changedKeys.length, 'changed item')}
+    </button>
+  );
 
   return (
     <div class="screen screen-wide">
@@ -247,9 +265,10 @@ export function DeleteScreen({ guard, keys, volumeName, onDone }: Props) {
                 <Kbd inverse>Enter</Kbd>
               </button>
             )}
+            {rescanButton}
             <span class="small faint">
               {plan.ready.count < plan.items.length
-                ? 'Blocked items are left out. Rescan to include changed items.'
+                ? 'Blocked items are left out. Re-scan changed items to review them again.'
                 : 'Nothing outside the listed items is touched.'}
             </span>
           </>
@@ -264,6 +283,7 @@ export function DeleteScreen({ guard, keys, volumeName, onDone }: Props) {
             <button type="button" class="button button-primary" onClick={leave}>
               Done
             </button>
+            {rescanButton}
             {run.items.some((item) => retryableStatuses.includes(item.status)) && (
               <button type="button" class="button" onClick={() => {
                 setRun(null);
@@ -284,7 +304,7 @@ export function DeleteScreen({ guard, keys, volumeName, onDone }: Props) {
               {leftInPlaceCount(items) > 0 && !note && (
                 <span class="warn-text">
                   {pluralize(leftInPlaceCount(items), 'item')} {leftInPlaceCount(items) === 1
-                    ? 'was' : 'were'} left untouched. Scan again to delete what changed.{' '}
+                    ? 'was' : 'were'} left untouched.{' '}
                 </span>
               )}
               {note || (run.permanent ? 'Space is freed now. Rescan to update the overview.'
@@ -458,6 +478,11 @@ function ItemRow({ item, active, afterRun }: { item: DeletionItem; active: boole
         {item.reason && <span class={`small tone-text-${tone} wrap-text`}>{item.reason}</span>}
         {!item.reason && item.categoryName && (
           <span class="small faint ellipsis">{item.categoryName}</span>
+        )}
+        {item.rescanned && (
+          <span class="small muted">
+            Re-scanned: size and contents as read just now; any further change blocks it.
+          </span>
         )}
         {item.cloudSync && (
           <span class="small warn-text">

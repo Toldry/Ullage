@@ -511,3 +511,44 @@ assistants truncate output, and a truncated reply costs a repair round; more bat
 cost one more copy and paste each. The item budget (900) and minimum size (100 MiB) are
 unchanged; `promptBatchLines` in `config.json` still overrides the default.
 
+## Deleting what changes, what is old, and seeing the prompt
+
+### D-070: Folders that change all the time are split into entries — Approved (owner request)
+A recipe can set `split_entries = true`. Each entry directly inside its folder is then
+its own item, plus one loose item for the folder's small files (which have no stored
+names, D-010). Every item is verified on its own, so one new file in `%TEMP%` blocks
+only the entry it landed in, not 25 GB of old temporary files. Only the user temp recipe
+uses it for now. Loose items keep their existing rules: anything added since the scan
+counts as a change.
+
+### D-071: An age filter for deleting what has not changed in a long time — Approved (owner request)
+The Delete step has "Unchanged for: any time / 1 month / 6 months / 1 year / 2 years /
+5 years". With a filter, only items whose newest change inside is older are listed and
+can be selected; the rest of each deletable category is reported as "changed in the
+last …" in the footer, and a category with nothing left is not listed. The filter is
+applied on the server, before items are trimmed for display, and deletion resolves the
+selection against the same filtered list, so "select all" never reaches a newer item.
+An item whose change time is unknown counts as recent. Categories the AI suggests
+keeping are not filtered.
+
+### D-072: Re-scanning changed items — Approved (owner request)
+Items blocked as "changed since the scan" can be re-scanned from step 6. Re-scanning
+re-runs every check; only an item whose contents differ, and that passes every other
+check (location, tier, ancestors), is read again. Its current state becomes the new
+baseline, shown with its new size for the user to confirm. Any change after the re-scan
+blocks it again (safety rule 6 is measured from the latest look, never skipped).
+Baselines last for the scan and are dropped by a new scan.
+
+### D-073: Categories to keep are always listed — Approved (owner request)
+The Delete list shows the AI's "keep" categories under their own heading after the
+deletable ones, instead of behind a link in the footer. They still cannot be selected.
+
+### D-074: The redaction review shows the real prompt lines — Approved (owner request)
+The inspector's "In the prompt" section shows the lines an export would contain for the
+selected item and everything inside it, after redaction and exactly as copied except for
+the item numbers: up to 8, largest first, with the total. An item without a line of its
+own shows the larger line that includes it. Hiding a folder as a whole tree makes it one
+line with only a size, which the assistant can only suggest keeping; the inspector says
+so. This is what happened to a 135 GB home folder in practice. The rules manager's
+"+ N more" loads every match of a rule (up to 1,000).
+

@@ -270,3 +270,16 @@ an unexplained row, API end-to-end with explanations, and a headless Chromium ru
 export, a refused unexplained reply, import, the Delete list, the Rust toolchains
 warning and the confirmation.
 
+
+## After Phase 6: changing folders, old files, re-scans, redaction preview
+
+Requested by the owner (amendment A-7). Built: split entries for `%TEMP%` (D-070), the
+"Unchanged for" age filter (D-071), re-scanning changed items from step 6 (D-072), kept
+categories always listed (D-073), the real prompt lines in the redaction inspector and
+the full match list of a rule (D-074).
+
+Tested: split entries in results and in the deletion guard (a change in one entry
+blocks only that entry), the age filter in results and the session, re-scan baselines
+in the guard and the session (accepted, kept, blocked again by a later change), prompt
+lines before and after a whole-tree redaction including the covering line, the rule
+match list, and a headless Chromium run of all of them.

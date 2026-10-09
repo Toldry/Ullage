@@ -63,6 +63,10 @@ func newFixture(t *testing.T) *fixture {
 	add("Users/mara/Clutter/old/x.bin", 3)
 	add("Users/mara/Clutter/keep-listed/y.bin", 200)
 	files.AddLink("/c/Users/mara/Clutter/shortcut", "/c/Windows")
+	// A recipe folder split into entries (decision D-070): small files and two entries.
+	files.AddFile("/c/Users/mara/AppData/Local/Temp/note.tmp", 4096, 1000)
+	add("Users/mara/AppData/Local/Temp/setup/x.bin", 50)
+	add("Users/mara/AppData/Local/Temp/busy/y.bin", 50)
 
 	tiers := tiersByName{
 		"Windows":       {Tier: scanner.TierSystem, ClaimID: scanner.NoClaim},
@@ -70,6 +74,7 @@ func newFixture(t *testing.T) *fixture {
 		"npm-cache":     {Tier: scanner.TierKnown, ClaimID: 0},
 		"nested-other":  {Tier: scanner.TierKnown, ClaimID: 1},
 		"sys":           {Tier: scanner.TierSystem, ClaimID: scanner.NoClaim},
+		"Temp":          {Tier: scanner.TierKnown, ClaimID: 2},
 	}
 	result := files.Scan(t, "/c", tiers)
 	return &fixture{files: files, result: result, guard: &Guard{Tree: result.Tree,
@@ -427,4 +432,55 @@ type blockingRemover struct {
 func (remover *blockingRemover) Recycle(paths []string) error {
 	<-remover.gate
 	return remover.fakeRemover.Recycle(paths)
+}
+
+// Entries of a split recipe folder are checked one by one: a change inside one entry
+// blocks only that entry, and the folder's small files go without touching any entry.
+func TestSplitEntriesAreIndependent(t *testing.T) {
+	fixture := newFixture(t)
+	temp := "Users/mara/AppData/Local/Temp"
+	entry := func(name string) Target {
+		return Target{Node: fixture.node(t, temp+"/"+name), Kind: KindFolder,
+			Tier: scanner.TierKnown, ClaimID: 2}
+	}
+	small := Target{Node: fixture.node(t, temp), Kind: KindLoose, Tier: scanner.TierKnown,
+		ClaimID: 2, Listed: []scanner.NodeIndex{fixture.node(t, temp+"/setup"),
+			fixture.node(t, temp+"/busy")}}
+	fixture.files.AddFile("/c/"+temp+"/busy/new.bin", 4096, 2000)
+	expectStatus(t, fixture.guard.Verify(entry("busy")), StatusChanged, "")
+	expectStatus(t, fixture.guard.Verify(entry("setup")), StatusReady, "")
+	remover := &fakeRemover{files: fixture.files}
+	if outcome := fixture.guard.Delete(small, remover, true); outcome.Status != StatusDeleted {
+		t.Fatalf("small files = %+v", outcome)
+	}
+	if outcome := fixture.guard.Delete(entry("setup"), remover, true); outcome.Status !=
+		StatusDeleted {
+		t.Fatalf("unchanged entry = %+v", outcome)
+	}
+	if fixture.files.Exists("/c/"+temp+"/note.tmp") ||
+		fixture.files.Exists("/c/"+temp+"/setup") || !fixture.files.Exists("/c/"+temp+"/busy") {
+		t.Fatal("wrong entries removed")
+	}
+}
+
+// Decision D-072: a re-scan's state, once accepted, is what the item must match; any
+// change after it blocks again. Location checks are not relaxed by it.
+func TestRescanBaseline(t *testing.T) {
+	fixture := newFixture(t)
+	target := fixture.unknownFolder(t, "Users/mara/Downloads")
+	fixture.files.AddFile("/c/Users/mara/Downloads/new.bin", 4096, 2000)
+	changed := fixture.guard.Verify(target)
+	if changed.Status != StatusChanged || !changed.OnlyContentChanged {
+		t.Fatalf("changed = %+v", changed)
+	}
+	target.Baseline = &changed.Now
+	expectStatus(t, fixture.guard.Verify(target), StatusReady, "")
+	fixture.files.AddFile("/c/Users/mara/Downloads/later.bin", 4096, 3000)
+	expectStatus(t, fixture.guard.Verify(target), StatusChanged, "after the re-scan")
+
+	// A refusal is never just a content change, so a re-scan cannot accept it.
+	protected := fixture.unknownFolder(t, "Windows/System32")
+	if check := fixture.guard.Verify(protected); check.OnlyContentChanged {
+		t.Fatalf("protected item offered for re-scan: %+v", check)
+	}
 }

@@ -34,6 +34,9 @@ type Check struct {
 	// Paths are the entries that are deleted: the item itself, or for loose contents the
 	// folder's small files and unlisted subfolders.
 	Paths []string `json:"-"`
+	// OnlyContentChanged: every check passed except that the contents differ from the
+	// baseline, so Now may be accepted as a new baseline by a re-scan (decision D-072).
+	OnlyContentChanged bool `json:"-"`
 }
 
 // lister reads each directory at most once per verification.
@@ -91,12 +94,13 @@ func (guard *Guard) Verify(target Target) Check {
 		return check
 	}
 	check.Scan = guard.scanFingerprint(target)
+	since := "the scan"
+	if target.Baseline != nil {
+		check.Scan, since = *target.Baseline, "the re-scan"
+	}
 	var status Status
 	var reason string
 	check.Now, check.Paths, status, reason = guard.diskFingerprint(disk, target)
-	if status == StatusReady {
-		status, reason = compareFingerprints(target.Kind, check.Scan, check.Now)
-	}
 	if status == StatusReady {
 		for _, path := range check.Paths {
 			if locationStatus, why := guard.checkLocation(path); locationStatus != StatusReady {
@@ -104,6 +108,10 @@ func (guard *Guard) Verify(target Target) Check {
 				break
 			}
 		}
+	}
+	if status == StatusReady {
+		status, reason = compareFingerprints(target.Kind, check.Scan, check.Now, since)
+		check.OnlyContentChanged = status == StatusChanged
 	}
 	check.Status, check.Reason = status, reason
 	return check
@@ -321,7 +329,7 @@ func (guard *Guard) looseFingerprint(disk *lister, target Target, path string) (
 }
 
 // compareFingerprints implements safety rule 6: any difference blocks the item.
-func compareFingerprints(kind Kind, scan, now Fingerprint) (Status, string) {
+func compareFingerprints(kind Kind, scan, now Fingerprint, since string) (Status, string) {
 	var changes []string
 	if now.Unreadable {
 		changes = append(changes, "part of it can no longer be read")
@@ -344,7 +352,7 @@ func compareFingerprints(kind Kind, scan, now Fingerprint) (Status, string) {
 	}
 	if now.Newest != scan.Newest {
 		changes = append(changes, "modified "+time.Unix(0, now.Newest).Format(
-			"2006-01-02 15:04")+", after the scan")
+			"2006-01-02 15:04")+", after "+since)
 	}
 	if len(changes) == 0 {
 		return StatusReady, ""

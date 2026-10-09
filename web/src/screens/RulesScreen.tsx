@@ -17,11 +17,14 @@ export function RulesScreen({ guard }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<RuleDraft>(emptyDraft);
   const [expanded, setExpanded] = useState<string | null>(null);
+  // Full match lists loaded with "+ N more", by rule ID.
+  const [allHits, setAllHits] = useState<Record<string, string[]>>({});
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     const loadedSummary = await guard(redactionApi.summary());
     setSummary(loadedSummary ?? null);
+    setAllHits({});
     if (loadedSummary?.available) setRules((await guard(redactionApi.rules())) ?? []);
   }, [guard]);
 
@@ -133,9 +136,23 @@ export function RulesScreen({ guard }: Props) {
                 ) : (
                   <>
                     <span class="faint">{rule.matches} matches in this scan:</span>
-                    {rule.hits.map((hit) => <span class="mono" key={hit}>{hit}</span>)}
-                    {rule.matches > rule.hits.length && (
-                      <span class="faint">+ {rule.matches - rule.hits.length} more</span>
+                    {(allHits[rule.id] ?? rule.hits).map((hit) => (
+                      <span class="mono" key={hit}>{hit}</span>
+                    ))}
+                    {rule.matches > (allHits[rule.id] ?? rule.hits).length && (
+                      allHits[rule.id] ? (
+                        <span class="faint">
+                          + {rule.matches - allHits[rule.id].length} more, not listed
+                        </span>
+                      ) : (
+                        <button type="button" class="link-button" onClick={async (event) => {
+                          event.stopPropagation();
+                          const hits = await guard(redactionApi.ruleHits(rule.id));
+                          if (hits) setAllHits((previous) => ({ ...previous, [rule.id]: hits }));
+                        }}>
+                          + {rule.matches - rule.hits.length} more
+                        </button>
+                      )
                     )}
                   </>
                 )}

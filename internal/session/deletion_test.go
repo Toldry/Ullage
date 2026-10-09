@@ -227,3 +227,41 @@ func TestVerificationReportsProgress(t *testing.T) {
 		}
 	}
 }
+
+// Decision D-072: preparing with a re-scan accepts a changed item's new state, shows its
+// new size, and a later change blocks it again.
+func TestRescanAcceptsChangedItems(t *testing.T) {
+	manager, lines, root := explainedFixture(t)
+	key := "ai:3|id:" + lines["photos"]
+	photos := filepath.Join(root, "photos")
+	if err := os.WriteFile(filepath.Join(photos, "added.bin"), make([]byte, 5000),
+		0o600); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := prepareAndWait(t, manager, []string{key})
+	if err != nil || statuses(plan)[key] != deletion.StatusChanged {
+		t.Fatalf("plain prepare = %+v %v", plan, err)
+	}
+	rescanned, err := manager.PrepareRescan([]string{key})
+	for err == nil && rescanned.Verifying {
+		time.Sleep(5 * time.Millisecond)
+		rescanned, err = manager.DeletionPlanProgress()
+	}
+	if err != nil || rescanned.Ready.Count != 1 || !rescanned.Items[0].Rescanned ||
+		rescanned.Items[0].Bytes == plan.Items[0].Bytes {
+		t.Fatalf("re-scan = %+v %v", rescanned, err)
+	}
+	// The accepted state is kept for later plans; a new change blocks again.
+	if again, _ := prepareAndWait(t, manager, []string{key}); statuses(again)[key] !=
+		deletion.StatusReady || !again.Items[0].Rescanned {
+		t.Fatalf("after re-scan = %+v", again)
+	}
+	if err := os.WriteFile(filepath.Join(photos, "later.bin"), []byte("x"),
+		0o600); err != nil {
+		t.Fatal(err)
+	}
+	if blocked, _ := prepareAndWait(t, manager, []string{key}); statuses(blocked)[key] !=
+		deletion.StatusChanged || !strings.Contains(blocked.Items[0].Reason, "after the re-scan") {
+		t.Fatalf("change after re-scan = %+v", blocked)
+	}
+}

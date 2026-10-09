@@ -132,3 +132,19 @@ func TestImportedRepliesStayReviewable(t *testing.T) {
 		t.Fatalf("batch reply not kept: %q", exported.Batches[0].Reply)
 	}
 }
+
+func TestUnchangedFilterSetting(t *testing.T) {
+	manager, _, _ := importedFixture(t)
+	view, err := manager.SetUnchangedDays(365)
+	// The fixture files were written just now, so nothing is a year old.
+	if err != nil || view.UnchangedDays != 365 || len(view.Categories) != 0 ||
+		view.Summary.TooRecentBytes == 0 {
+		t.Fatalf("filtered view = %+v %v", view, err)
+	}
+	if _, err := manager.SetUnchangedDays(-1); err == nil {
+		t.Fatal("negative days accepted")
+	}
+	if view, _ := manager.SetUnchangedDays(0); len(view.Categories) != 2 {
+		t.Fatalf("filter off: %+v", view.Categories)
+	}
+}

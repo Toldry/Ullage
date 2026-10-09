@@ -38,6 +38,9 @@ type Target struct {
 	ClaimID int32
 	// Bytes is the reclaimable size the Results screen showed, for progress only.
 	Bytes int64
+	// Baseline, when set, replaces the scan as what the item must still match: the state
+	// a re-scan recorded and the user confirmed after seeing it (decision D-072).
+	Baseline *Fingerprint
 }
 
 // Status is the outcome of checking or deleting one target.

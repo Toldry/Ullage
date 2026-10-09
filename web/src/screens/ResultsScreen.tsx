@@ -1,10 +1,11 @@
+import { Fragment } from 'preact';
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { Checkbox, Kbd } from '../components/Controls';
 import { copyText } from '../lib/clipboard';
 import { formatBytes, formatCount, formatClock, pluralize } from '../lib/format';
 import {
   itemKey, restKey, resultsApi, selectedTotals, selectionState,
-  toggleCategory, type Selection,
+  toggleCategory, unchangedChoices, type Selection,
 } from '../lib/results';
 import type { ResultCategory, ResultItem, ResultsView } from '../lib/types';
 
@@ -33,7 +34,6 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
   const [source, setSource] = useState<SourceFilter>('all');
   const [confidence, setConfidence] = useState<ConfidenceFilter>('any');
   const [regenerable, setRegenerable] = useState<RegenerableFilter>('any');
-  const [showKept, setShowKept] = useState(false);
 
   const accept = useCallback((loaded: ResultsView | undefined) => {
     if (!loaded) return;
@@ -49,7 +49,11 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
     (source === 'all' || category.source === source) &&
     (confidence === 'any' || category.confidence === confidence) &&
     (regenerable === 'any' || category.regenerable === regenerable));
-  const keptRows = showKept ? view?.kept ?? [] : [];
+  // Categories the AI suggests keeping are always listed, after the deletable ones.
+  const keptRows = (view?.kept ?? []).filter((category) =>
+    (source === 'all' || category.source === source) &&
+    (confidence === 'any' || category.confidence === confidence) &&
+    (regenerable === 'any' || category.regenerable === regenerable));
   const allRows = [...rows, ...keptRows];
 
   const toggleExpand = useCallback(async (category: ResultCategory) => {
@@ -134,9 +138,8 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
         </div>
       )}
 
-      {view.categories.length === 0 ? (
-        <EmptyResults view={view} keptBytes={keptBytes} onRescan={onRescan}
-          onShowKept={() => setShowKept(true)} />
+      {view.categories.length === 0 && view.unchangedDays === 0 ? (
+        <EmptyResults view={view} keptBytes={keptBytes} onRescan={onRescan} />
       ) : (
         <div class="results-toolbar">
           <div class="segmented" role="group" aria-label="Source">
@@ -170,6 +173,19 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
               <option value="no">no</option>
             </select>
           </label>
+          <label class="filter-select" title={'Only items whose newest change is at least ' +
+            'this old are listed and can be selected'}>
+            <span>Unchanged for</span>
+            <select class="select" value={view.unchangedDays} onChange={async (event) =>
+              accept(await guard(resultsApi.unchanged(
+                Number((event.target as HTMLSelectElement).value))))}>
+              {unchangedChoices.some((choice) => choice.days === view.unchangedDays) ? null
+                : <option value={view.unchangedDays}>{view.unchangedDays} days</option>}
+              {unchangedChoices.map((choice) => (
+                <option key={choice.days} value={choice.days}>{choice.label}</option>
+              ))}
+            </select>
+          </label>
           <span class="spacer" />
           <span class="cell-mono muted">
             {totals.items ? `${pluralize(totals.items, 'item')} · ${formatBytes(totals.bytes)} ` +
@@ -184,6 +200,15 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
         </div>
       )}
 
+      {view.categories.length === 0 && view.unchangedDays > 0 && (
+        <div class="results-empty">
+          <div class="result-title">Nothing is that old</div>
+          <div class="muted">
+            Every deletable item changed more recently. Choose a shorter time, or any time.
+          </div>
+        </div>
+      )}
+
       {allRows.length > 0 && (
         <div class="results-table" role="table" aria-label="Categories">
           <div class="results-row results-head" role="row">
@@ -191,7 +216,16 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
             <span class="align-right">Items</span><span class="results-source">Source</span>
             <span>Confidence</span><span>Regenerable</span><span />
           </div>
-          {allRows.map((category, index) => (
+          {allRows.map((category, index) => (<Fragment key={category.key}>
+            {index === rows.length && (
+              <div class="results-group" role="row">
+                <span class="strong-500">The AI suggests keeping</span>
+                <span class="small muted">
+                  {formatBytes(keptBytes)} in {pluralize(view.kept.length, 'category',
+                    'categories')} · listed so you can see them; they can't be selected
+                </span>
+              </div>
+            )}
             <CategoryRow key={category.key} category={category} largest={largest}
               kept={index >= rows.length}
               focused={index === Math.min(focused, allRows.length - 1)}
@@ -206,7 +240,7 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
                 else next.add(key);
                 onSelectionChange(next);
               }} />
-          ))}
+          </Fragment>))}
         </div>
       )}
 
@@ -215,13 +249,12 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
         {formatBytes(view.summary.knownKeptBytes)} Known that recipes keep (installed apps
         and categories under {formatBytes(view.minimumItemBytes)}),{' '}
         {formatBytes(view.summary.unclassifiedBytes)} Unknown not classified
-        {view.kept.length > 0 && <>
-          , and{' '}
-          <button type="button" class="link-button" onClick={() => setShowKept(!showKept)}>
-            {formatBytes(keptBytes)} in {pluralize(view.kept.length, 'category',
-              'categories')} the AI suggests keeping
-          </button>
-        </>}. Keys: j / k move, Enter expand, x select, D review deletion.
+        {view.summary.tooRecentBytes > 0 && <>
+          , {formatBytes(view.summary.tooRecentBytes)} changed in{' '}
+          {unchangedChoices.find((choice) => choice.days === view.unchangedDays)?.since ??
+            `the last ${view.unchangedDays} days`} (hidden by the filter)
+        </>}
+. Keys: j / k move, Enter expand, x select, D review deletion.
       </div>
     </div>
   );
@@ -231,7 +264,6 @@ function EmptyResults(props: {
   view: ResultsView;
   keptBytes: number;
   onRescan: () => void;
-  onShowKept: () => void;
 }) {
   const { summary } = props.view;
   return (
@@ -258,11 +290,6 @@ function EmptyResults(props: {
       </div>
       <div class="actions">
         <button type="button" class="button" onClick={props.onRescan}>Scan again</button>
-        {props.view.kept.length > 0 && (
-          <button type="button" class="ghost-button" onClick={props.onShowKept}>
-            Browse classified items
-          </button>
-        )}
       </div>
     </div>
   );

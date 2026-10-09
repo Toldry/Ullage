@@ -2,7 +2,9 @@ import { api } from './api';
 import type { DeletionItem, DeletionPlan, DeletionRun, DeletionStatus } from './types';
 
 export const deletionApi = {
-  prepare: (keys: string[]) => api.post<DeletionPlan>('/api/delete/prepare', { keys }),
+  // rescan accepts the current state of items that changed since the scan (D-072).
+  prepare: (keys: string[], rescan = false) =>
+    api.post<DeletionPlan>('/api/delete/prepare', { keys, rescan }),
   execute: (planId: string, permanent: boolean, confirmation: string) =>
     api.post<DeletionRun>('/api/delete/execute', { planId, permanent, confirmation }),
   plan: () => api.get<DeletionPlan>('/api/delete/plan'),

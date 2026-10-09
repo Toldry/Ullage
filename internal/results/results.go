@@ -124,6 +124,9 @@ type Category struct {
 	CloudSyncItems int   `json:"cloudSyncItems"`
 	NotLocalBytes  int64 `json:"notLocalBytes"`
 	Selectable     bool  `json:"selectable"`
+	// TooRecentItems and TooRecentBytes are what the age filter left out (D-071).
+	TooRecentItems int   `json:"tooRecentItems,omitempty"`
+	TooRecentBytes int64 `json:"tooRecentBytes,omitempty"`
 }
 
 // Summary accounts for every scanned byte, so an empty result still explains itself.
@@ -133,6 +136,8 @@ type Summary struct {
 	KeptByAIBytes     int64 `json:"keptByAiBytes"`
 	UnclassifiedBytes int64 `json:"unclassifiedBytes"`
 	ReclaimableBytes  int64 `json:"reclaimableBytes"`
+	// TooRecentBytes are deletable bytes the age filter hides.
+	TooRecentBytes int64 `json:"tooRecentBytes"`
 }
 
 // Model is the Results screen's data.
@@ -165,6 +170,9 @@ type Input struct {
 	Deleted      map[string]bool
 	MinimumBytes int64
 	Profile      string
+	// UnchangedBefore, when set (Unix seconds), lists only items whose newest change is
+	// older; the rest of a deletable category is counted as too recent (decision D-071).
+	UnchangedBefore int64
 }
 
 // Build produces the merged, sorted list.
@@ -172,16 +180,25 @@ func Build(input Input) Model {
 	model := Model{Categories: []Category{}, Kept: []Category{}}
 	restorer := newRestorer(input)
 	recipeCategories, knownListed := buildRecipeCategories(input)
-	model.Categories = append(model.Categories, recipeCategories...)
+	for _, category := range recipeCategories {
+		model.Summary.TooRecentBytes += category.TooRecentBytes
+		if category.ItemCount > 0 {
+			model.Categories = append(model.Categories, category)
+		}
+	}
 	var aiClassified int64
 	for _, imported := range input.Imported {
 		category := buildAICategory(input, imported, restorer)
 		if category.ItemCount == 0 && wasDeleted(input, imported) {
 			continue
 		}
-		aiClassified += category.Bytes
+		aiClassified += category.Bytes + category.TooRecentBytes
 		if imported.Category.Deletable {
-			model.Categories = append(model.Categories, category)
+			model.Summary.TooRecentBytes += category.TooRecentBytes
+			// A category the age filter emptied is not listed while the filter is on.
+			if category.ItemCount > 0 || category.TooRecentItems == 0 {
+				model.Categories = append(model.Categories, category)
+			}
 		} else {
 			category.Selectable = false
 			model.Kept = append(model.Kept, category)
@@ -235,33 +252,64 @@ func buildRecipeCategories(input Input) ([]Category, int64) {
 			order = append(order, recipe.ID)
 		}
 		for _, root := range input.ClaimRoots[claimID] {
-			bytes, files := claimedBytes(input.Tree, root, claimID)
-			if bytes == 0 {
-				continue
-			}
-			node := input.Tree.Node(root)
-			if input.Deleted[DeletedKey(root, false)] {
-				continue
-			}
-			category.Items = append(category.Items, withCloud(input.Tree, Item{
-				Key: nodeKey(root), Kind: itemKind(node.Kind, false), Bytes: bytes,
-				Files: files, Path: displayPath(input, root, false),
-				Modified: modifiedOf(node), Node: root, Tier: scanner.TierKnown,
-				ClaimID: claimID}))
+			category.Items = append(category.Items, recipeItems(input, root, claimID,
+				recipe.SplitEntries)...)
 		}
 	}
 	var categories []Category
 	var listedBytes int64
 	for _, recipeID := range order {
 		category := byRecipe[recipeID]
-		finishItems(category)
-		if category.Bytes < input.MinimumBytes || category.Bytes == 0 {
+		// The size threshold applies to the whole category, before the age filter.
+		var total int64
+		for _, item := range category.Items {
+			total += item.Bytes
+		}
+		if total < input.MinimumBytes || total == 0 {
 			continue
 		}
-		listedBytes += category.Bytes
+		filterByAge(input, category)
+		finishItems(category)
+		listedBytes += total
 		categories = append(categories, *category)
 	}
 	return categories, listedBytes
+}
+
+// recipeItems lists what a claim root contributes: the root itself, or with split
+// entries each claimed entry directly inside it and one loose item for its small files.
+func recipeItems(input Input, root scanner.NodeIndex, claimID int32, split bool) []Item {
+	node := input.Tree.Node(root)
+	if !split || node.Kind != platform.EntryDirectory {
+		return claimedItem(input, root, claimID)
+	}
+	var items []Item
+	for _, child := range node.Children {
+		items = append(items, claimedItem(input, child, claimID)...)
+	}
+	if node.ClaimID == claimID && node.Tier == scanner.TierKnown && node.OwnBytes > 0 &&
+		!input.Deleted[DeletedKey(root, true)] {
+		modified := node.SmallFilesModified / int64(time.Second)
+		items = append(items, withCloud(input.Tree, Item{Key: "loose:" + itoa(int(root)),
+			Kind: "loose", Bytes: node.OwnBytes, Files: int64(node.SmallFileCount),
+			Path: displayPath(input, root, true), Modified: modified, Node: root,
+			Listed: append([]scanner.NodeIndex{}, node.Children...),
+			Tier:   scanner.TierKnown, ClaimID: claimID}))
+	}
+	return items
+}
+
+// claimedItem is one node with the bytes the claim owns in it, if any.
+func claimedItem(input Input, index scanner.NodeIndex, claimID int32) []Item {
+	bytes, files := claimedBytes(input.Tree, index, claimID)
+	if bytes == 0 || input.Deleted[DeletedKey(index, false)] {
+		return nil
+	}
+	node := input.Tree.Node(index)
+	return []Item{withCloud(input.Tree, Item{Key: nodeKey(index),
+		Kind: itemKind(node.Kind, false), Bytes: bytes, Files: files,
+		Path: displayPath(input, index, false), Modified: modifiedOf(node), Node: index,
+		Tier: scanner.TierKnown, ClaimID: claimID})}
 }
 
 func newRecipeCategory(recipe *recipes.Recipe) *Category {
@@ -335,6 +383,9 @@ func buildAICategory(input Input, imported ImportedCategory, restorer *restorer)
 		}
 		category.Items = append(category.Items, withCloud(input.Tree, entry))
 	}
+	if row.Deletable {
+		filterByAge(input, &category)
+	}
 	finishItems(&category)
 	if row.What != "" && row.Lost != "" {
 		steps := make([]Step, len(row.Steps))
@@ -357,6 +408,25 @@ func aiKey(number int) string { return "ai:" + itoa(number) }
 
 // AIKey is the key of an AI category, for callers that track expansion.
 func AIKey(number int) string { return aiKey(number) }
+
+// filterByAge drops items changed at or after the filter's cutoff, counting them as too
+// recent. An item without a known change time counts as recent, so it is never offered
+// as old by mistake.
+func filterByAge(input Input, category *Category) {
+	if input.UnchangedBefore == 0 {
+		return
+	}
+	kept := category.Items[:0]
+	for _, item := range category.Items {
+		if item.Modified > 0 && item.Modified < input.UnchangedBefore {
+			kept = append(kept, item)
+		} else {
+			category.TooRecentItems++
+			category.TooRecentBytes += item.Bytes
+		}
+	}
+	category.Items = kept
+}
 
 // finishItems totals the items, sorts them by size and trims the list.
 func finishItems(category *Category) {

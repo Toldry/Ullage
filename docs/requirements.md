@@ -283,3 +283,15 @@ conversation, in appropriate Markdown files.
   allow brute-force removal, with a ⚠ warning explaining what it may break. This
   replaces "managed only" for the Docker Desktop disk image (D-068).
 
+### A-7 (after Phase 6): changing folders, old files, and a clearer redaction review
+
+- Folders that programs write to constantly (%TEMP%) are deleted entry by entry, so
+  changes in some entries do not block the rest (D-070).
+- An easy way to delete what has not changed in a long time: an age filter in the
+  Delete step (D-071).
+- Items that changed since the scan can be re-scanned from the Delete step and
+  confirmed at their new size (D-072).
+- Categories the AI suggests keeping are always listed (D-073).
+- The redaction review previews how the selected item reads in the copied prompt; a
+  rule's full match list can be opened (D-074).
+

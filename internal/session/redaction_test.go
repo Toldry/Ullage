@@ -170,3 +170,46 @@ func TestUnreadableRulesFailClosedAndAreNeverOverwritten(t *testing.T) {
 		t.Fatalf("redaction still unavailable after reset")
 	}
 }
+
+// The inspector shows the item's prompt lines after redaction: a whole-tree redaction
+// turns a folder into one placeholder line, and what is inside it is covered by that line.
+func TestDetailShowsPromptLines(t *testing.T) {
+	manager := exportingManager(t, t.TempDir())
+	code := manager.RedactionSummary().SessionCode
+	clients := findItem(t, manager, code, "root", "clients")
+	before, err := manager.Detail(code, clients.ID)
+	if err != nil || before.LineCount < 1 || strings.Contains(strings.Join(before.Lines, ""),
+		"<R") || !strings.Contains(before.Lines[0], "clients/") {
+		t.Fatalf("before = %+v %v", before, err)
+	}
+	if err := manager.SetOverride(OverrideRequest{SessionCode: code, ID: clients.ID,
+		Treatment: "subtree"}); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := manager.Detail(code, clients.ID)
+	if after.LineCount != 1 || !strings.Contains(after.Lines[0], "<R") ||
+		strings.Contains(after.Lines[0], "clients") {
+		t.Fatalf("after = %+v", after)
+	}
+	inside := findItem(t, manager, code, "root", "clients", "northwind")
+	covered, _ := manager.Detail(code, inside.ID)
+	if covered.LineCount != 0 || covered.CoveredBy != after.Lines[0] {
+		t.Fatalf("inside = %+v", covered)
+	}
+}
+
+func TestRuleHitsListsEveryMatch(t *testing.T) {
+	manager, _ := scannedManager(t, t.TempDir())
+	if _, err := manager.SaveRule(RuleRequest{Type: redact.RuleName, Pattern: "*.bin",
+		Treatment: redact.TreatmentKeepExtension}); err != nil {
+		t.Fatal(err)
+	}
+	rules, _ := manager.Rules()
+	hits, err := manager.RuleHits(rules[0].ID)
+	if err != nil || len(hits) != 4 || len(hits) != rules[0].Matches {
+		t.Fatalf("hits = %v %v, rule = %+v", hits, err, rules[0])
+	}
+	if _, err := manager.RuleHits("missing"); !errors.Is(err, ErrNoSuchRule) {
+		t.Fatalf("unknown rule: %v", err)
+	}
+}

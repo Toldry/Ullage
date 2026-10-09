@@ -4,7 +4,18 @@ import type { ResultCategory, ResultsView } from './types';
 export const resultsApi = {
   get: () => api.get<ResultsView>('/api/results'),
   expand: (key: string) => api.post<ResultsView>('/api/results/expand', { key }),
+  unchanged: (days: number) => api.post<ResultsView>('/api/results/unchanged', { days }),
 };
+
+// The age filter's choices: list only items whose newest change is this old (D-071).
+export const unchangedChoices: { days: number; label: string; since: string }[] = [
+  { days: 0, label: 'any time', since: '' },
+  { days: 30, label: '1 month', since: 'the last month' },
+  { days: 182, label: '6 months', since: 'the last 6 months' },
+  { days: 365, label: '1 year', since: 'the last year' },
+  { days: 730, label: '2 years', since: 'the last 2 years' },
+  { days: 1825, label: '5 years', since: 'the last 5 years' },
+];
 
 // Selection holds item keys. A category with more items than the list shows is selected
 // as a whole through its "rest" key, so hidden items are never selected one by one.

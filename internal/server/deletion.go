@@ -18,13 +18,18 @@ func writeDeletionError(writer http.ResponseWriter, err error) {
 func (server *Server) handlePrepareDeletion(writer http.ResponseWriter,
 	request *http.Request) {
 	var selection struct {
-		Keys []string `json:"keys"`
+		Keys   []string `json:"keys"`
+		Rescan bool     `json:"rescan"`
 	}
 	if err := decodeJSON(request, &selection); err != nil {
 		writeJSONError(writer, http.StatusBadRequest, "invalid request: "+err.Error())
 		return
 	}
-	plan, err := server.manager.PrepareDeletion(selection.Keys)
+	prepare := server.manager.PrepareDeletion
+	if selection.Rescan {
+		prepare = server.manager.PrepareRescan
+	}
+	plan, err := prepare(selection.Keys)
 	if err != nil {
 		writeDeletionError(writer, err)
 		return

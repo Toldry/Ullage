@@ -145,8 +145,10 @@ type Manager struct {
 	log         *eventLog
 	redaction   redactionState
 	exportState exportState
-	deletion    deletionState
-	history     *history.Store
+	// unchangedDays is the Delete step's age filter; 0 lists everything (decision D-071).
+	unchangedDays int
+	deletion      deletionState
+	history       *history.Store
 	// pendingEvents are scan events held back from the log file until the scan finishes
 	// and their paths can be rendered through the redactor.
 	pendingEvents []scanner.Event

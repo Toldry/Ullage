@@ -424,6 +424,40 @@ function Inspector(props: {
         </div>
       </div>
       <div class="inspector-section">
+        <div class="section-title">In the prompt</div>
+        <div class="prompt-preview">
+          {detail.lines.map((line, index) => (
+            <div class="prompt-preview-line" key={index}><Rendered text={line} /></div>
+          ))}
+          {detail.lineCount > detail.lines.length && (
+            <div class="faint">
+              + {detail.lineCount - detail.lines.length} more{' '}
+              {detail.lineCount - detail.lines.length === 1 ? 'line' : 'lines'}
+            </div>
+          )}
+          {detail.lineCount === 0 && detail.coveredBy && (
+            <>
+              <div class="faint">No line of its own; it is part of this line:</div>
+              <div class="prompt-preview-line"><Rendered text={detail.coveredBy} /></div>
+            </>
+          )}
+          {detail.lineCount === 0 && !detail.coveredBy && (
+            <div class="faint">
+              Not in the prompt: nothing here is large enough or Unknown.
+            </div>
+          )}
+        </div>
+        <div class="small faint">
+          {detail.lineCount === 1 && item.kind === 'folder' && item.decision === 'subtree' &&
+            item.hasChildren
+            ? 'Hidden as a whole, so it is one line: the assistant sees only its size and ' +
+              'can only suggest keeping it. Keep well-known folder names, or hide less, ' +
+              'for a finer answer. '
+            : ''}
+          Exactly as copied, except that item numbers are assigned at export.
+        </div>
+      </div>
+      <div class="inspector-section">
         <div class="section-title">Treatment</div>
         {locked ? (
           <div class="muted small">
@@ -489,24 +523,6 @@ function Inspector(props: {
           <div class="small faint">Not remembered: applies to this session only.</div>
         </div>
       )}
-      <div class="inspector-section">
-        <div class="section-title">In the prompt</div>
-        <div class="prompt-preview">
-          <div class="preview-line">
-            <span class="muted align-right">{formatBytes(item.bytes, 1)}</span>
-            <span class="ellipsis"><Rendered text={item.rendered} /></span>
-          </div>
-          {detail.preview.map((child) => (
-            <div class="preview-line" key={child.id}>
-              <span class="muted align-right">{formatBytes(child.bytes, 1)}</span>
-              <span class="ellipsis"><Rendered text={child.rendered} /></span>
-            </div>
-          ))}
-        </div>
-        <div class="small faint">
-          Item numbers and line grouping are assigned at export.
-        </div>
-      </div>
     </div>
   );
 }

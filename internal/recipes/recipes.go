@@ -59,6 +59,11 @@ type Recipe struct {
 	ManagedSteps []ManagedStep       `toml:"managed_steps" json:"managedSteps"`
 	ManagedNote  string              `toml:"managed_note" json:"managedNote,omitempty"`
 	BruteForce   BruteForcePolicy    `toml:"brute_force" json:"bruteForce"`
+	// SplitEntries lists each entry directly inside a matched folder as its own item, plus
+	// one item for its small files. For folders that programs write to all the time
+	// (%TEMP%), the entries that did not change since the scan can then be deleted
+	// instead of the whole folder being blocked by one new file (decision D-070).
+	SplitEntries bool `toml:"split_entries" json:"splitEntries,omitempty"`
 	// Priority orders recipes when patterns overlap; lower wins. Defaults to file order.
 	Priority int `toml:"priority" json:"-"`
 }

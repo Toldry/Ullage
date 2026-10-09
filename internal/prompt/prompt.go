@@ -267,3 +267,21 @@ func renderLine(current entry, header []string, items []Item) string {
 		len(current.items)) +
 		details(files, newest, oldest, scanner.MergeExtensions(summaries, 3), true)
 }
+
+// Select returns the items an export would list, without numbering or batching them, so
+// the redaction review can show what a choice does to the prompt.
+func Select(tree *scanner.Tree, redactor *redact.Redactor, options Options) []Item {
+	items, _ := selectItems(tree, redactor, options)
+	return items
+}
+
+// PreviewLine renders an item the way its prompt line reads, without the ID (which is
+// assigned at export) and with its full path rather than under a shared header.
+func PreviewLine(item Item, redactor *redact.Redactor) string {
+	path := redactor.Render(item.Node)
+	if item.Kind == ItemLooseContents {
+		path += "/*"
+	}
+	return formatSize(item.Bytes) + " " + path +
+		details(item.Files, item.modified, item.created, item.types, item.nameShown)
+}

@@ -3,6 +3,7 @@ package session
 import (
 	"errors"
 	"sort"
+	"time"
 
 	"github.com/toldry/ullage/internal/recipes"
 	"github.com/toldry/ullage/internal/results"
@@ -57,6 +58,8 @@ type ResultsView struct {
 	BatchCount       int    `json:"batchCount"`
 	BatchesImported  int    `json:"batchesImported"`
 	MinimumItemBytes int64  `json:"minimumItemBytes"`
+	// UnchangedDays is the age filter in effect; 0 when off.
+	UnchangedDays int `json:"unchangedDays"`
 }
 
 // Results merges recipe categories with the imported AI categories.
@@ -88,7 +91,11 @@ func (manager *Manager) resultsView() (ResultsView, error) {
 		MinimumBytes: manager.promptOptions().MinimumItemBytes,
 		Profile:      manager.CurrentProfile(),
 	}
-	view := ResultsView{MinimumItemBytes: input.MinimumBytes}
+	if manager.unchangedDays > 0 {
+		input.UnchangedBefore = time.Now().AddDate(0, 0, -manager.unchangedDays).Unix()
+	}
+	view := ResultsView{MinimumItemBytes: input.MinimumBytes,
+		UnchangedDays: manager.unchangedDays}
 	if state.export != nil {
 		view.Code = state.export.Code
 		view.BatchCount = len(state.export.Batches)
@@ -134,4 +141,20 @@ func (manager *Manager) MarkExpanded(key string) (ResultsView, error) {
 		}
 	}
 	return ResultsView{}, ErrNoSuchCategory
+}
+
+// maximumUnchangedDays bounds the age filter to something a person could mean.
+const maximumUnchangedDays = 100 * 365
+
+// SetUnchangedDays sets the age filter: only items whose newest change is at least this
+// many days old are listed and can be selected; 0 turns it off. Deletion resolves the
+// selection against the same filtered list.
+func (manager *Manager) SetUnchangedDays(days int) (ResultsView, error) {
+	if days < 0 || days > maximumUnchangedDays {
+		return ResultsView{}, errors.New("days must be between 0 and 36500")
+	}
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
+	manager.unchangedDays = days
+	return manager.resultsView()
 }

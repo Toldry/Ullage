@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/toldry/ullage/internal/platform"
 	"github.com/toldry/ullage/internal/prompt"
@@ -325,5 +326,83 @@ func TestCloudSyncedItemsAreFlagged(t *testing.T) {
 	}
 	if kestrel := byKey(model, "ai:1"); kestrel.CloudSyncItems != 0 {
 		t.Fatalf("unrelated category flagged: %+v", kestrel)
+	}
+}
+
+// A recipe with split entries lists each entry inside its folder, and the folder's small
+// files as one loose item, so unchanged entries can be deleted while others change.
+func TestSplitEntriesListsEachEntry(t *testing.T) {
+	fileSystem := scannertest.New()
+	fileSystem.AddFile("/c/Temp/setup-cache/payload.bin", 200*megabyte, 1)
+	fileSystem.AddFile("/c/Temp/big.log", 150*megabyte, 1)
+	fileSystem.AddFile("/c/Temp/note.tmp", 2048, 7)
+	result := fileSystem.Scan(t, "/c", claimsByName{"Temp": 0})
+	temp := recipe("temp", true)
+	temp.SplitEntries = true
+	redactor := redact.New(redact.Options{Tree: result.Tree,
+		Registry: redact.NewRegistry(nil, 1, true)})
+	export := prompt.Build(result.Tree, redactor, "ABCDEF", prompt.DefaultOptions)
+	input := Input{Tree: result.Tree, ClaimRoots: result.ClaimRoots,
+		RecipeForClaim: func(int32) *recipes.Recipe { return temp }, Redactor: redactor,
+		Export: &export, Expanded: map[string]bool{},
+		MinimumBytes: prompt.DefaultOptions.MinimumItemBytes}
+	category := byKey(Build(input), "recipe:temp")
+	if category == nil || category.ItemCount != 3 {
+		t.Fatalf("category = %+v", category)
+	}
+	kinds := map[string]string{}
+	for _, item := range category.Items {
+		kinds[item.Path] = item.Kind
+	}
+	if kinds["/c/Temp/setup-cache"] != "folder" || kinds["/c/Temp/big.log"] != "file" ||
+		kinds["/c/Temp/*"] != "loose" {
+		t.Fatalf("items = %v", kinds)
+	}
+	loose := category.Items[2]
+	if loose.Files != 1 || loose.Bytes == 0 || len(loose.Listed) != 2 {
+		t.Fatalf("loose item = %+v", loose)
+	}
+
+	// A deleted entry is no longer listed; the others stay.
+	input.Deleted = map[string]bool{DeletedKey(category.Items[0].Node, false): true}
+	if again := byKey(Build(input), "recipe:temp"); again.ItemCount != 2 {
+		t.Fatalf("after deleting one entry: %+v", again.Items)
+	}
+}
+
+// Decision D-071: with an age filter only items unchanged since the cutoff are listed;
+// the rest is counted as too recent, and a category left empty is not listed.
+func TestAgeFilter(t *testing.T) {
+	old := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	recent := time.Now().Add(-24 * time.Hour)
+	fileSystem := scannertest.New()
+	fileSystem.AddFile("/c/Temp/old-setup/payload.bin", 200*megabyte, old.UnixNano())
+	fileSystem.AddFile("/c/Temp/today/payload.bin", 150*megabyte, recent.UnixNano())
+	fileSystem.AddFile("/c/Cache/fresh.bin", 300*megabyte, recent.UnixNano())
+	result := fileSystem.Scan(t, "/c", claimsByName{"Temp": 0, "Cache": 1})
+	temp, cache := recipe("temp", true), recipe("cache", true)
+	temp.SplitEntries = true
+	byClaim := []*recipes.Recipe{temp, cache}
+	redactor := redact.New(redact.Options{Tree: result.Tree,
+		Registry: redact.NewRegistry(nil, 1, true)})
+	export := prompt.Build(result.Tree, redactor, "ABCDEF", prompt.DefaultOptions)
+	input := Input{Tree: result.Tree, ClaimRoots: result.ClaimRoots,
+		RecipeForClaim: func(claimID int32) *recipes.Recipe { return byClaim[claimID] },
+		Redactor:       redactor, Export: &export, Expanded: map[string]bool{},
+		MinimumBytes: prompt.DefaultOptions.MinimumItemBytes}
+	all := Build(input)
+
+	input.UnchangedBefore = old.AddDate(1, 0, 0).Unix()
+	filtered := Build(input)
+	tempCategory := byKey(filtered, "recipe:temp")
+	if tempCategory == nil || tempCategory.ItemCount != 1 ||
+		tempCategory.Items[0].Path != "/c/Temp/old-setup" ||
+		tempCategory.TooRecentItems != 1 || byKey(filtered, "recipe:cache") != nil {
+		t.Fatalf("filtered = %+v", filtered.Categories)
+	}
+	if filtered.Summary.TooRecentBytes != 450*megabyte ||
+		filtered.Summary.ReclaimableBytes != 200*megabyte ||
+		filtered.Summary.KnownKeptBytes != all.Summary.KnownKeptBytes {
+		t.Fatalf("summary = %+v, unfiltered %+v", filtered.Summary, all.Summary)
 	}
 }

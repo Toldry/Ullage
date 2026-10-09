@@ -29,6 +29,9 @@ type deletionState struct {
 	runItems []DeletionItem
 	// deleted holds results.DeletedKey values; reset by a new scan.
 	deleted map[string]bool
+	// baselines are re-scanned states the items must still match, by results.DeletedKey
+	// (decision D-072); reset by a new scan.
+	baselines map[string]deletion.Fingerprint
 	// recorded: the finished run's outcomes are reflected in deleted and the history.
 	// The run is reported finished only then, so a refresh never shows stale results.
 	recorded bool
@@ -41,6 +44,8 @@ type deletionPlan struct {
 	started time.Time
 	items   []DeletionItem
 	targets map[string]deletion.Target
+	// rescan accepts the current state of items whose contents changed (D-072).
+	rescan bool
 
 	verifying    bool
 	current      string
@@ -66,6 +71,9 @@ type DeletionItem struct {
 	CloudSync bool `json:"cloudSync,omitempty"`
 	// Warning is the recipe's brute-force warning, repeated where the user confirms.
 	Warning string `json:"warning,omitempty"`
+	// Rescanned: the item was read again and is checked against that state, not the
+	// scan's; Bytes is then its size at the re-scan.
+	Rescanned bool `json:"rescanned,omitempty"`
 }
 
 // Tally counts items and bytes.
@@ -163,11 +171,17 @@ func (manager *Manager) resolveSelection(keys []string) ([]DeletionItem,
 			if _, duplicate := targets[full]; duplicate {
 				continue
 			}
-			targets[full] = targetFor(full, category, item)
-			items = append(items, DeletionItem{Key: full, Category: category.Key,
+			target := targetFor(full, category, item)
+			entry := DeletionItem{Key: full, Category: category.Key,
 				CategoryName: category.Name, Path: item.Path, Kind: item.Kind,
 				Bytes: item.Bytes, CloudSync: item.CloudSync,
-				Warning: category.BruteForce.Warning})
+				Warning: category.BruteForce.Warning}
+			if baseline, found := manager.deletion.baselines[baselineKey(target)]; found {
+				target.Baseline = &baseline
+				entry.Rescanned, entry.Bytes = true, baseline.LogicalBytes
+			}
+			targets[full] = target
+			items = append(items, entry)
 		}
 	}
 	return items, targets, nil
@@ -208,6 +222,10 @@ func targetFor(key string, category results.Category, item results.Item) deletio
 		Listed: item.Listed, Tier: item.Tier, ClaimID: item.ClaimID, Bytes: item.Bytes}
 }
 
+func baselineKey(target deletion.Target) string {
+	return results.DeletedKey(target.Node, target.Kind == deletion.KindLoose)
+}
+
 // guard builds the deletion guard for the finished scan. Callers hold manager.lock.
 func (manager *Manager) guard() *deletion.Guard {
 	tree := manager.completed.Result.Tree
@@ -234,6 +252,18 @@ const StatusPending deletion.Status = "pending"
 // disk in the background; DeletionPlanProgress reports how far it got. The disk work runs
 // without the session lock; the scan tree it reads never changes.
 func (manager *Manager) PrepareDeletion(keys []string) (DeletionPlan, error) {
+	return manager.prepareDeletion(keys, false)
+}
+
+// PrepareRescan is PrepareDeletion that also re-scans: an item whose contents changed
+// since the scan, and that passes every other check, is read again and from then on
+// checked against what was read. It is shown with its new size for the user to confirm
+// (decision D-072).
+func (manager *Manager) PrepareRescan(keys []string) (DeletionPlan, error) {
+	return manager.prepareDeletion(keys, true)
+}
+
+func (manager *Manager) prepareDeletion(keys []string, rescan bool) (DeletionPlan, error) {
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 	if manager.completed == nil {
@@ -264,7 +294,7 @@ func (manager *Manager) PrepareDeletion(keys []string) (DeletionPlan, error) {
 		}
 	}
 	plan := &deletionPlan{id: id, started: time.Now(), items: items, targets: targets,
-		verifying: true}
+		rescan: rescan, verifying: true}
 	manager.deletion.plan = plan
 	go manager.verifyPlan(plan, manager.guard())
 	return planView(plan), nil
@@ -302,7 +332,9 @@ func (manager *Manager) verifyPlan(plan *deletionPlan, guard *deletion.Guard) {
 			return
 		}
 		plan.items[index].Status, plan.items[index].Reason = check.Status, check.Reason
-		if check.Status == deletion.StatusChanged && check.Now.LogicalBytes > 0 {
+		if plan.rescan && check.OnlyContentChanged {
+			manager.acceptRescan(plan, index, target, check.Now)
+		} else if check.Status == deletion.StatusChanged && check.Now.LogicalBytes > 0 {
 			plan.items[index].NowBytes = check.Now.LogicalBytes
 		}
 		plan.checked++
@@ -321,6 +353,21 @@ func (manager *Manager) verifyPlan(plan *deletionPlan, guard *deletion.Guard) {
 	manager.logf("delete", "verified %d: %d ready, %d changed, %d missing, %d refused",
 		len(plan.items), view.Ready.Count, view.Changed.Count, view.Missing.Count,
 		view.Refused.Count)
+}
+
+// acceptRescan records what a re-scan read as the item's new baseline and marks the item
+// ready at its new size. Callers hold manager.lock.
+func (manager *Manager) acceptRescan(plan *deletionPlan, index int, target deletion.Target,
+	now deletion.Fingerprint) {
+	if manager.deletion.baselines == nil {
+		manager.deletion.baselines = map[string]deletion.Fingerprint{}
+	}
+	manager.deletion.baselines[baselineKey(target)] = now
+	target.Baseline = &now
+	plan.targets[plan.items[index].Key] = target
+	item := &plan.items[index]
+	item.Status, item.Reason, item.NowBytes = deletion.StatusReady, "", 0
+	item.Rescanned, item.Bytes = true, now.LogicalBytes
 }
 
 // DeletionPlanProgress returns the current plan, while or after it is verified.

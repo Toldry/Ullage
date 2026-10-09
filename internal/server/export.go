@@ -80,3 +80,20 @@ func (server *Server) handleExpand(writer http.ResponseWriter, request *http.Req
 	}
 	writeJSON(writer, http.StatusOK, view)
 }
+
+func (server *Server) handleUnchangedFilter(writer http.ResponseWriter,
+	request *http.Request) {
+	var filter struct {
+		Days int `json:"days"`
+	}
+	if err := decodeJSON(request, &filter); err != nil {
+		writeJSONError(writer, http.StatusBadRequest, "invalid request: "+err.Error())
+		return
+	}
+	view, err := server.manager.SetUnchangedDays(filter.Days)
+	if err != nil {
+		writeJSONError(writer, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(writer, http.StatusOK, view)
+}

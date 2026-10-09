@@ -10,6 +10,7 @@ import (
 
 	"github.com/toldry/ullage/internal/overview"
 	"github.com/toldry/ullage/internal/platform"
+	"github.com/toldry/ullage/internal/prompt"
 	"github.com/toldry/ullage/internal/redact"
 	"github.com/toldry/ullage/internal/scanner"
 )
@@ -24,6 +25,10 @@ type redactionState struct {
 	redactor *redact.Redactor
 	// version counts redaction changes, so an export can tell it is out of date.
 	version int
+	// previewItems is what an export would list with previewRedactor, kept for the
+	// inspector until the redactor changes.
+	previewItems    []prompt.Item
+	previewRedactor *redact.Redactor
 }
 
 // ErrRulesUnavailable is returned by every redaction operation while the rules file
@@ -345,13 +350,20 @@ func hasUnknownChildren(tree *scanner.Tree, node *scanner.Node) bool {
 
 // RedactionDetail is the inspector panel for one item.
 type RedactionDetail struct {
-	Item    RedactionItem   `json:"item"`
-	Preview []RedactionItem `json:"preview"`
+	Item RedactionItem `json:"item"`
+	// Lines are the prompt lines for the item and what is inside it, largest first, as
+	// they would read after redaction (IDs aside). LineCount counts all of them.
+	Lines     []string `json:"lines"`
+	LineCount int      `json:"lineCount"`
+	// CoveredBy is the line of a larger item that includes this one, when the item has no
+	// line of its own: a folder listed whole, or the rest of a folder.
+	CoveredBy string `json:"coveredBy,omitempty"`
 }
 
-const previewLength = 4
+// previewLineLimit bounds the prompt lines shown for one item.
+const previewLineLimit = 8
 
-// Detail returns an item and how its largest descendants would appear in a prompt.
+// Detail returns an item and how it and what is inside it would appear in a prompt.
 func (manager *Manager) Detail(sessionCode string, index scanner.NodeIndex) (
 	RedactionDetail, error) {
 	manager.lock.Lock()
@@ -363,29 +375,73 @@ func (manager *Manager) Detail(sessionCode string, index scanner.NodeIndex) (
 	if !manager.validNode(index) {
 		return RedactionDetail{}, errors.New("unknown item")
 	}
-	detail := RedactionDetail{Item: manager.redactionItem(redactor, index),
-		Preview: []RedactionItem{}}
+	detail := RedactionDetail{Item: manager.redactionItem(redactor, index)}
+	manager.addPromptLines(&detail, redactor, index)
+	return detail, nil
+}
+
+// addPromptLines fills in how the item appears in the prompt. Callers hold manager.lock.
+func (manager *Manager) addPromptLines(detail *RedactionDetail, redactor *redact.Redactor,
+	index scanner.NodeIndex) {
+	state := &manager.redaction
+	if state.previewRedactor != redactor {
+		state.previewItems = prompt.Select(manager.completed.Result.Tree, redactor,
+			manager.promptOptions())
+		state.previewRedactor = redactor
+	}
 	tree := manager.completed.Result.Tree
-	frontier := []scanner.NodeIndex{index}
-	for len(frontier) > 0 && len(detail.Preview) < previewLength {
-		current := frontier[0]
-		frontier = frontier[1:]
-		children := append([]scanner.NodeIndex(nil), tree.Node(current).Children...)
-		sort.Slice(children, func(first, second int) bool {
-			return tree.Node(children[first]).TierBytes(scanner.TierUnknown) >
-				tree.Node(children[second]).TierBytes(scanner.TierUnknown)
-		})
-		for _, child := range children {
-			if tree.Node(child).TierBytes(scanner.TierUnknown) == 0 {
-				continue
-			}
-			if len(detail.Preview) < previewLength {
-				detail.Preview = append(detail.Preview, manager.redactionItem(redactor, child))
-			}
-			frontier = append(frontier, child)
+	var inside []prompt.Item
+	for _, item := range state.previewItems {
+		switch {
+		case item.Node == index || isAncestor(tree, index, item.Node):
+			inside = append(inside, item)
+		case detail.CoveredBy == "" && covers(tree, item, index):
+			detail.CoveredBy = prompt.PreviewLine(item, redactor)
 		}
 	}
-	return detail, nil
+	sort.SliceStable(inside, func(first, second int) bool {
+		return inside[first].Bytes > inside[second].Bytes
+	})
+	detail.LineCount = len(inside)
+	detail.Lines = []string{}
+	for _, item := range inside[:min(len(inside), previewLineLimit)] {
+		detail.Lines = append(detail.Lines, prompt.PreviewLine(item, redactor))
+	}
+	if len(inside) > 0 {
+		detail.CoveredBy = ""
+	}
+}
+
+// isAncestor reports whether ancestor is a strict ancestor of index.
+func isAncestor(tree *scanner.Tree, ancestor, index scanner.NodeIndex) bool {
+	for current := tree.Node(index).Parent; current != scanner.NoNode; current =
+		tree.Node(current).Parent {
+		if current == ancestor {
+			return true
+		}
+	}
+	return false
+}
+
+// covers reports whether a larger item's line includes the node: a folder listed whole
+// above it, or the rest of a folder whose listed children do not lead to it.
+func covers(tree *scanner.Tree, item prompt.Item, index scanner.NodeIndex) bool {
+	if !isAncestor(tree, item.Node, index) {
+		return false
+	}
+	if item.Kind != prompt.ItemLooseContents {
+		return item.Kind == prompt.ItemFolder
+	}
+	child := index
+	for tree.Node(child).Parent != item.Node {
+		child = tree.Node(child).Parent
+	}
+	for _, listed := range item.Listed {
+		if listed == child {
+			return false
+		}
+	}
+	return true
 }
 
 // OverrideRequest sets or clears a session-only treatment for one item.
@@ -463,6 +519,41 @@ func (manager *Manager) Rules() ([]RuleView, error) {
 	}
 	return views, nil
 }
+
+// maximumHitsListed bounds the full match list of one rule.
+const maximumHitsListed = 1000
+
+// RuleHits lists up to maximumHitsListed paths a rule matches in the current scan.
+func (manager *Manager) RuleHits(id string) ([]string, error) {
+	manager.lock.Lock()
+	defer manager.lock.Unlock()
+	if manager.redaction.loadError != nil {
+		return nil, ErrRulesUnavailable
+	}
+	redactor, err := manager.currentRedactor()
+	if err != nil {
+		return nil, err
+	}
+	for index, rule := range manager.redaction.document.Rules {
+		if rule.ID != id {
+			continue
+		}
+		hits := []string{}
+		tree := manager.completed.Result.Tree
+		for _, node := range redactor.Matches()[index].Nodes {
+			if len(hits) == maximumHitsListed {
+				break
+			}
+			hits = append(hits, overview.DisplayPath(tree.Path(node),
+				manager.CurrentProfile()))
+		}
+		return hits, nil
+	}
+	return nil, ErrNoSuchRule
+}
+
+// ErrNoSuchRule means a request named a rule that does not exist.
+var ErrNoSuchRule = errors.New("no such rule")
 
 // RuleRequest creates or updates a rule. With FromNode set (creating from the redaction
 // review), the pattern and anchor come from that item.

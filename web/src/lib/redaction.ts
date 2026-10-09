@@ -20,6 +20,9 @@ export const redactionApi = {
     api.post<RedactionDetail>('/api/redaction/override',
       { sessionCode: code, id, treatment, keepWellKnown }),
   rules: () => api.get<RuleView[]>('/api/rules'),
+  // Every path a rule matches in the current scan, up to 1,000.
+  ruleHits: (id: string) =>
+    api.get<string[]>(`/api/rules/hits?id=${encodeURIComponent(id)}`),
   saveRule: (draft: RuleDraft) => api.post<RuleView>('/api/rules/save', draft),
   deleteRule: (id: string) => api.post('/api/rules/delete', { id }),
   resetRules: () => api.post<{ movedTo: string }>('/api/rules/reset', { confirm: 'reset' }),
