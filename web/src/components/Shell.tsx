@@ -1,6 +1,8 @@
 import type { ComponentChildren } from 'preact';
+import { useEffect, useRef } from 'preact/hooks';
 import { Kbd, Logo } from './Controls';
 import { formatBytes, formatCount } from '../lib/format';
+import { quitWarning, type Work } from '../lib/quit';
 
 export type Screen =
   | 'scan'
@@ -29,6 +31,7 @@ export function TopBar(props: {
   elevated: boolean;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+  onQuit: () => void;
 }) {
   return (
     <header class="topbar">
@@ -62,6 +65,14 @@ export function TopBar(props: {
       <button type="button" class="ghost-button" onClick={props.onToggleTheme}>
         {props.theme === 'dark' ? 'Dark' : 'Light'}
         <Kbd>T</Kbd>
+      </button>
+      <button
+        type="button"
+        class="ghost-button quit-button"
+        title="Shut Ullage down. It also exits by itself 30 minutes after its last tab closes."
+        onClick={props.onQuit}
+      >
+        Quit
       </button>
     </header>
   );
@@ -181,6 +192,81 @@ export function InvalidSession(props: { port: number }) {
           <div>127.0.0.1:{props.port || '—'} · session token rejected</div>
           <div>No scan data was loaded into this page.</div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// QuitDialog asks before a quit that would stop a running scan or deletion (D-079).
+export function QuitDialog(props: { work: Work; onCancel: () => void; onConfirm: () => void }) {
+  const warning = quitWarning(props.work);
+  const keepButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    keepButton.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        props.onCancel();
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [props.onCancel]);
+  return (
+    <div class="modal-scrim" onClick={props.onCancel}>
+      <div
+        class="modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="quit-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div class="banner-title warn-text" id="quit-title">{warning.title}</div>
+        <p class="muted">{warning.body}</p>
+        <div class="actions">
+          <button type="button" class="button" ref={keepButton} onClick={props.onCancel}>
+            Keep running
+          </button>
+          <button type="button" class="button-danger" onClick={props.onConfirm}>
+            {warning.action}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ShutDown replaces the app once Ullage was quit, or when it no longer answers because it
+// exited after 30 minutes without an open tab.
+export function ShutDown(props: { phase: 'quitting' | 'stopped'; quitHere: boolean;
+  deleting: boolean }) {
+  const stopping = props.phase === 'quitting';
+  return (
+    <div class="centered">
+      <div class="invalid-box">
+        <div class="brand">
+          <Logo />
+          <span class="brand-name">Ullage</span>
+        </div>
+        <div class="heading">
+          <h1>{stopping ? 'Shutting down…' : 'Ullage has shut down'}</h1>
+          <p class="lead">
+            {stopping
+              ? props.deleting
+                ? 'Finishing the item being deleted now. Nothing else will be deleted.'
+                : 'Ullage is exiting.'
+              : props.quitHere
+                ? 'You can close this tab.'
+                : 'It is no longer running, either because it was quit or because no tab ' +
+                  'was open for 30 minutes. You can close this tab.'}
+          </p>
+        </div>
+        {!stopping && (
+          <div class="card">
+            <div class="banner-title">To use Ullage again, start it from the Start menu.</div>
+            <div class="muted">It opens a new tab with a fresh link.</div>
+          </div>
+        )}
       </div>
     </div>
   );

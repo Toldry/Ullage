@@ -617,3 +617,31 @@ managed-cleanup-only recipes cannot be overridden, and every safety check, the R
 Bin default and the typed confirmation for permanent deletion still run at step 6. The
 row, the confirmation list and the deletion progress mark these items "deleting anyway"
 so the choice stays visible until the end.
+
+## Quitting
+
+### D-079: A Quit button, and exiting 30 minutes after the last tab closes — Approved (owner request)
+The release build has no console and no tray icon, so the only ways to stop Ullage were
+Task Manager or waiting for the idle shutdown. Now:
+1. A **Quit** button sits at the right of the top bar. When nothing runs it quits at
+   once. While a scan or a deletion runs, `POST /api/quit` answers 409 with what is
+   running, and the UI asks first ("Keep running" is focused, Esc keeps running). The
+   check is on the server, so a stale tab cannot skip it. A confirmed quit cancels the
+   scan and stops the deletion after the item being deleted now, then waits for that
+   item (up to 5 minutes) so nothing is left half-moved to the Recycle Bin and the
+   history records what was deleted. The tab shows "Shutting down…" until the server
+   stops answering, then "Ullage has shut down". A finished scan with nothing running
+   is not confirmed: it is the normal end of a session, and quitting changes nothing on
+   disk.
+2. **Idle shutdown moves from 15 to 30 minutes** and now restarts its clock while work
+   runs. Presence is the existing heartbeat: every open tab posts `/api/heartbeat` once
+   a minute (browsers keep one-minute timers in background tabs), and any authenticated
+   request counts. A scan or deletion never lets the process exit, and once it ends the
+   user still gets the full 30 minutes, so a long scan that finishes after its tab was
+   closed is still there when they come back. A paused scan counts as running.
+3. A tab whose server no longer answers (quit elsewhere, or idle shutdown while the tab
+   was frozen by the browser) shows the same "has shut down" page instead of request
+   errors. A tab coming back to the foreground sends a heartbeat at once, so it finds out
+   straight away.
+Heartbeats were kept over Server-Sent Events or a WebSocket: they already existed, need
+no long-lived connection per tab, and the one-minute granularity is far below the limit.

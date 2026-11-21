@@ -57,6 +57,11 @@ type Server struct {
 	httpServer   *http.Server
 	port         int
 	lastActivity atomic.Int64
+	// work reports what is in progress; tests replace it.
+	work func() Work
+	// quitting is set once a quit was accepted, so a second click does not start a
+	// second shutdown.
+	quitting atomic.Bool
 }
 
 // New listens on a random free port of 127.0.0.1. It never binds other interfaces.
@@ -68,6 +73,7 @@ func New(manager *session.Manager, options Options) (*Server, error) {
 	port := listener.Addr().(*net.TCPAddr).Port
 	server := &Server{options: options, guard: NewGuard(port), manager: manager,
 		listener: listener, port: port}
+	server.work = server.managerWork
 	server.httpServer = &http.Server{
 		Handler:           server,
 		ReadHeaderTimeout: 10 * time.Second,
@@ -515,11 +521,6 @@ func (server *Server) handleRelaunch(writer http.ResponseWriter, _ *http.Request
 		writeJSONError(writer, http.StatusConflict, "relaunch did not start: "+err.Error())
 		return
 	}
-	writeJSON(writer, http.StatusOK, map[string]bool{"ok": true})
-	server.quitSoon()
-}
-
-func (server *Server) handleQuit(writer http.ResponseWriter, _ *http.Request) {
 	writeJSON(writer, http.StatusOK, map[string]bool{"ok": true})
 	server.quitSoon()
 }

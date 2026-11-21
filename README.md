@@ -70,7 +70,7 @@ flowchart LR
 2. Run it. Your browser opens on a local, one-time link. The first run adds
    **Ullage** to the Start menu.
 3. Running it again while it is open just opens a new tab of the same session. It exits
-   by itself 15 minutes after the last tab closes.
+   by itself 30 minutes after the last tab closes, or use **Quit** in the top bar.
 
 To verify a download, compare its checksum with `SHA256SUMS.txt` from the same
 release. While the repository is public you can also check that GitHub built it from

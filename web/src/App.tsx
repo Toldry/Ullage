@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { InvalidSession, Main, Sidebar, StatusBar, TopBar, type Screen } from './components/Shell';
-import { api, ApiError, SessionExpiredError } from './lib/api';
+import {
+  InvalidSession, Main, QuitDialog, ShutDown, Sidebar, StatusBar, TopBar, type Screen,
+} from './components/Shell';
+import { api, ApiError, ServerUnreachableError, SessionExpiredError } from './lib/api';
+import { requestQuit, type Work } from './lib/quit';
 import { formatBytes } from './lib/format';
 import type {
   Config, ExportView, LogLine, Overview, Progress, ResultCategory, Status, Volume,
@@ -20,6 +23,8 @@ import { ScanScreen, type ScanSelection } from './screens/ScanScreen';
 type Theme = 'dark' | 'light';
 
 const heartbeatMilliseconds = 60_000;
+// While shutting down, how often the tab checks whether the process has exited.
+const shutdownPollMilliseconds = 1_000;
 
 function preferredTheme(config?: Config): Theme {
   if (config?.theme === 'dark' || config?.theme === 'light') return config.theme;
@@ -29,6 +34,10 @@ function preferredTheme(config?: Config): Theme {
 export function App() {
   const [status, setStatus] = useState<Status | null>(null);
   const [invalid, setInvalid] = useState(false);
+  // Quitting (D-079): the confirmation shown for running work, and the shutdown state.
+  const [quitPrompt, setQuitPrompt] = useState<Work | null>(null);
+  const [shutdown, setShutdown] = useState<{ phase: 'quitting' | 'stopped';
+    quitHere: boolean; deleting: boolean } | null>(null);
   const [screen, setScreen] = useState<Screen>('scan');
   const [theme, setTheme] = useState<Theme>(preferredTheme());
   const [config, setConfig] = useState<Config>({ theme: '', includeOtherProfiles: false,
@@ -65,7 +74,10 @@ export function App() {
       return await work;
     } catch (failure) {
       if (failure instanceof SessionExpiredError) setInvalid(true);
-      else setError(failure instanceof ApiError ? failure.message : String(failure));
+      else if (failure instanceof ServerUnreachableError) {
+        setShutdown((previous) => previous ? { ...previous, phase: 'stopped' }
+          : { phase: 'stopped', quitHere: false, deleting: false });
+      } else setError(failure instanceof ApiError ? failure.message : String(failure));
       return undefined;
     }
   }, []);
@@ -103,10 +115,36 @@ export function App() {
       }
       else if (loadedStatus.hasOverview) await loadOverview();
     })();
-    const heartbeat = window.setInterval(
-      () => guard(api.post('/api/heartbeat')), heartbeatMilliseconds);
-    return () => window.clearInterval(heartbeat);
+    const beat = () => guard(api.post('/api/heartbeat'));
+    const heartbeat = window.setInterval(beat, heartbeatMilliseconds);
+    // A tab coming back from the background tells the server at once, and finds out
+    // straight away if Ullage exited while the tab was away.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void beat();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(heartbeat);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [guard, loadOverview]);
+
+  // After a quit was accepted, poll until the server stops answering.
+  useEffect(() => {
+    if (shutdown?.phase !== 'quitting') return;
+    const poll = window.setInterval(() => guard(api.post('/api/heartbeat')),
+      shutdownPollMilliseconds);
+    return () => window.clearInterval(poll);
+  }, [shutdown?.phase, guard]);
+
+  const quit = useCallback(async (confirm: boolean) => {
+    setQuitPrompt(null);
+    const outcome = await guard(requestQuit(confirm));
+    if (!outcome) return;
+    if (outcome.kind === 'confirm') setQuitPrompt(outcome.work);
+    else setShutdown({ phase: 'quitting', quitHere: true, deleting: outcome.work.deleting });
+  }, [guard]);
+  const cancelQuit = useCallback(() => setQuitPrompt(null), []);
 
   // While scanning, progress arrives over Server-Sent Events (cookie-authenticated). The
   // stream stays open on every screen, so the progress is current when the user returns.
@@ -194,6 +232,7 @@ export function App() {
     const target = event.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
     if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (quitPrompt || shutdown) return;
     if (event.key === '1') navigate('scan');
     else if (event.key === '2') navigate('overview');
     else if (event.key === '3') navigate('redact');
@@ -209,7 +248,7 @@ export function App() {
     } else if (event.key === 'Escape' && screen === 'scanning') {
       void guard(api.post('/api/scan/cancel'));
     }
-  }, [navigate, toggleTheme, screen, startFromKeyboard, guard]);
+  }, [navigate, toggleTheme, screen, startFromKeyboard, guard, quitPrompt, shutdown]);
 
   useEffect(() => {
     window.addEventListener('keydown', onKeyDown);
@@ -227,6 +266,13 @@ export function App() {
       totalBytes: volume.totalBytes, freeBytes: volume.freeBytes };
   }, [overview, volumes, selected]);
 
+  if (shutdown) {
+    return (
+      <div class="app">
+        <ShutDown {...shutdown} />
+      </div>
+    );
+  }
   if (invalid) {
     return (
       <div class="app">
@@ -255,6 +301,7 @@ export function App() {
         elevated={status.elevated}
         theme={theme}
         onToggleTheme={toggleTheme}
+        onQuit={() => void quit(false)}
       />
       <div class="body">
         <Sidebar
@@ -345,6 +392,10 @@ export function App() {
         files={scanRunning ? progress?.files : overview?.files}
         elevated={status.elevated}
       />
+      {quitPrompt && (
+        <QuitDialog work={quitPrompt} onCancel={cancelQuit}
+          onConfirm={() => void quit(true)} />
+      )}
     </div>
   );
 }

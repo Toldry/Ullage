@@ -24,8 +24,9 @@ import (
 var version = "0.1.0-dev"
 
 // idleShutdown ends the process when no tab has been in touch for this long and no scan
-// runs. Open tabs send a heartbeat every minute, even when in the background.
-const idleShutdown = 15 * time.Minute
+// or deletion runs (D-079). Open tabs send a heartbeat every minute, even when in the
+// background, so this only passes once every Ullage tab has been closed.
+const idleShutdown = 30 * time.Minute
 
 // instanceName names the single-instance channel; the platform adds the user's identity.
 const instanceName = "Ullage"
@@ -165,9 +166,8 @@ func run(noBrowser bool) error {
 		case <-interrupts:
 			return localServer.Close()
 		case <-idleCheck.C:
-			if localServer.IdleFor() > idleShutdown &&
-				manager.Progress().State != session.StateRunning &&
-				!manager.DeletionRunning() {
+			if localServer.IdleShutdownDue(idleShutdown) {
+				manager.Log("idle", fmt.Sprintf("no tab for %s, exiting", idleShutdown))
 				return localServer.Close()
 			}
 		}

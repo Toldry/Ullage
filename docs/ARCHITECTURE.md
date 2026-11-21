@@ -115,7 +115,7 @@ decision below may assume Windows outside one boundary:
 
 ```
 ullage/
-├── cmd/ullage/              main: start server, open browser, idle shutdown
+├── cmd/ullage/              main: start server, open browser, idle shutdown (D-079)
 ├── internal/
 │   ├── platform/            the only OS-specific code (*_windows.go, *_linux.go)
 │   ├── scanner/             parallel walker, sizes, hard links, dates, file-type mix
