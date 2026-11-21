@@ -44,7 +44,7 @@ jobs:
       prerelease: ${{ steps.version.outputs.prerelease }}
       skip: ${{ steps.version.outputs.skip }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # every tag and the commits since the last one
 
@@ -99,7 +99,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-go@v5
         with:
