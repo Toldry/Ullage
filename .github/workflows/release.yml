@@ -1,11 +1,17 @@
 name: Release
 
-# Pushing a tag like v0.1.0 builds, tests and publishes a GitHub Release. Running the
-# workflow by hand does everything except publishing, and keeps the files as workflow
-# artifacts, to rehearse a release.
+# Every push to main that changes the program publishes a new patch release
+# automatically (see the "version" job for the rules). Pushing a tag like v1.0.0 by hand
+# still publishes that exact version. Running the workflow by hand does everything
+# except publishing, and keeps the files as workflow artifacts, to rehearse a release.
 on:
   push:
+    branches: [main]
     tags: ["v*"]
+    paths-ignore:
+      - "docs/**"
+      - "AGENTS.md"
+      - ".github/workflows/ci.yml"
   workflow_dispatch:
     inputs:
       version:
@@ -18,35 +24,82 @@ permissions:
   id-token: write # sign the build provenance
   attestations: write
 
+# One release at a time, so two quick pushes to main cannot pick the same version. A
+# newer push waiting in line replaces an older one; it contains its commits anyway.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
-  release:
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash
+  # Decides the version. A pushed tag is used as is. A push to main takes the highest
+  # stable tag (vX.Y.Z) and bumps it: the patch number by default, the minor number if a
+  # commit since that tag says [minor] in its message, the major number for [major]. A
+  # head commit that says [skip release], or that already carries a v* tag, publishes
+  # nothing.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      skip: ${{ steps.version.outputs.skip }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # every tag and the commits since the last one
 
       - name: Version
         id: version
         env:
           INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            version="$INPUT_VERSION"
+          elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             version="${GITHUB_REF_NAME#v}"
           else
-            version="$INPUT_VERSION"
+            if git log -1 --format=%B | grep -qiF "[skip release]"; then
+              echo "The head commit says [skip release]."
+              echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            if [[ -n "$(git tag --points-at HEAD --list 'v*')" ]]; then
+              echo "This commit is already released as $(git tag --points-at HEAD --list 'v*')."
+              echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            last=$(git tag --list 'v*' --sort=-v:refname \
+              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+            if [[ -z "$last" ]]; then
+              version="0.1.0"
+            else
+              IFS=. read -r major minor patch <<< "${last#v}"
+              messages=$(git log "$last..HEAD" --format=%B)
+              if grep -qiF "[major]" <<< "$messages"; then
+                version="$((major + 1)).0.0"
+              elif grep -qiF "[minor]" <<< "$messages"; then
+                version="$major.$((minor + 1)).0"
+              else
+                version="$major.$minor.$((patch + 1))"
+              fi
+            fi
+            echo "Last release: ${last:-none}. Next: $version"
           fi
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
             echo "::error::'$version' is not a version like 1.2.3 or 1.2.3-beta.1"
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
           if [[ "$version" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; fi
+
+  release:
+    needs: version
+    if: needs.version.outputs.skip != 'true'
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
@@ -73,7 +126,7 @@ jobs:
 
       - name: Build executables
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.version.outputs.version }}
           CGO_ENABLED: "0"
         run: |
           mkdir -p release
@@ -86,7 +139,7 @@ jobs:
       - name: Smoke test the amd64 executable
         shell: pwsh
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
           # The release build has no console, so its output is redirected to a file.
           $exe = "release/ullage-$env:VERSION-windows-amd64.exe"
@@ -99,7 +152,7 @@ jobs:
 
       - name: Package
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
           scripts/notices.sh release/THIRD-PARTY-NOTICES.txt
           for arch in amd64 arm64; do
@@ -126,16 +179,17 @@ jobs:
       - name: Keep the files as workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ullage-${{ steps.version.outputs.version }}
+          name: ullage-${{ needs.version.outputs.version }}
           path: release/
 
       - name: Publish the release
         if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
-          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+          VERSION: ${{ needs.version.outputs.version }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
           PRIVATE: ${{ github.event.repository.private }}
+          TAG: ${{ needs.version.outputs.tag }}
         run: |
           cat > notes.md <<NOTES
           Download \`ullage-$VERSION-windows-amd64.exe\` (most PCs) or the \`arm64\` build
@@ -155,5 +209,12 @@ jobs:
           fi
           flags=()
           if [[ "$PRERELEASE" == "true" ]]; then flags+=(--prerelease); fi
-          gh release create "$GITHUB_REF_NAME" release/* --verify-tag \
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            flags+=(--verify-tag)
+          else
+            # Creates the tag on the commit that was built. A tag made with this token
+            # does not start another workflow run.
+            flags+=(--target "$GITHUB_SHA")
+          fi
+          gh release create "$TAG" release/* \
             --title "Ullage $VERSION" --notes-file notes.md --generate-notes "${flags[@]}"

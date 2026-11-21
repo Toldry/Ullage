@@ -143,7 +143,7 @@ ullage/
 ├── tools/tokenestimate/     DEV ONLY: token estimate for prompts of a sample scan
 ├── scripts/                 build scripts and the third-party notices generator
 ├── docs/                    this file, requirements, decisions, phase plan
-└── .github/workflows/       CI on Windows and Linux; release on version tags
+└── .github/workflows/       CI on Windows and Linux; release on every push to main
 ```
 
 Rules for dependencies between packages: `prompt` and `response` never import `deletion`;

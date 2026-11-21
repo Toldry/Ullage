@@ -120,16 +120,30 @@ scripts\build.ps1           # PowerShell
 
 ## Releasing
 
-Push a version tag; the [Release workflow](.github/workflows/release.yml) tests
-everything, builds `amd64` and `arm64` executables, smoke-tests one, packages zips with
-the README and `THIRD-PARTY-NOTICES.txt`, writes `SHA256SUMS.txt`, attests build
-provenance (public repository only) and publishes the GitHub Release. A version with a
-suffix (`0.2.0-beta.1`) becomes a pre-release. Running the workflow by hand rehearses
-all of it without publishing.
+Releases are automatic. Every push to `main` that changes the program (anything but
+`docs/`, `AGENTS.md` and the CI workflow) runs the
+[Release workflow](.github/workflows/release.yml): it tests everything, builds `amd64`
+and `arm64` executables, smoke-tests one, packages zips with the README and
+`THIRD-PARTY-NOTICES.txt`, writes `SHA256SUMS.txt`, attests build provenance (public
+repository only) and publishes the GitHub Release with notes listing the changes.
+
+The version comes from the highest `vX.Y.Z` tag. Each release bumps the patch number by
+default. Words in a commit message (any commit since the last release) change that:
+
+| In a commit message | Effect                      |
+| ------------------- | --------------------------- |
+| `[minor]`           | `0.1.4` → `0.2.0`           |
+| `[major]`           | `0.1.4` → `1.0.0`           |
+| `[skip release]`    | no release for this push (head commit only) |
+
+To publish an exact version instead, such as a pre-release, push its tag. A version
+with a suffix (`0.2.0-beta.1`) becomes a pre-release, and a commit that already carries
+a tag is not released again. Running the workflow by hand rehearses everything without
+publishing.
 
 ```sh
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0-beta.1
+git push origin v0.2.0-beta.1
 ```
 
 ## Testing

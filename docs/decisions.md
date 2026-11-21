@@ -464,6 +464,19 @@ module, the npm runtime dependencies bundled into the UI, and the IBM Plex fonts
 The executables are not Authenticode-signed (no certificate), so SmartScreen may warn
 on first run. A manual run rehearses everything without publishing.
 
+### D-076: Automatic releases from main — Approved (owner request)
+Every push to `main` that changes the program publishes a release; pushes that touch
+only `docs/`, `AGENTS.md` or the CI workflow do not. A first job on Linux picks the
+version: the highest stable `vX.Y.Z` tag with its patch number bumped, or its minor or
+major number when a commit since that tag says `[minor]` or `[major]`. The head commit
+saying `[skip release]`, or already carrying a `v*` tag, skips the release. The Windows
+job then runs exactly as for a pushed tag (D-065) and `gh release create --target`
+creates the tag on the commit it built; a tag made with the workflow's token starts no
+further run. Pushing a tag by hand still publishes that exact version, which is how
+pre-releases are made. Runs share one concurrency group, so two quick pushes cannot pick
+the same number. Only Windows executables are published: the product is Windows-only,
+the Linux build exists to keep the platform seam honest, and there is no macOS port.
+
 ## Explanations in the reply, one Delete step
 
 ### D-066: Explanations are part of every reply — Approved (owner request)
