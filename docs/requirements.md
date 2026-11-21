@@ -294,4 +294,7 @@ conversation, in appropriate Markdown files.
 - Categories the AI suggests keeping are always listed (D-073).
 - The redaction review previews how the selected item reads in the copied prompt; a
   rule's full match list can be opened (D-074).
+- A home folder hidden as a whole tree still reads `~` and, with well-known names kept,
+  splits along the standard profile folders instead of becoming one size-only line
+  (D-075).
 

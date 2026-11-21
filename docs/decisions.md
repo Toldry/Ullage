@@ -552,3 +552,22 @@ line with only a size, which the assistant can only suggest keeping; the inspect
 so. This is what happened to a 135 GB home folder in practice. The rules manager's
 "+ N more" loads every match of a rule (up to 1,000).
 
+
+### D-075: A hidden home folder keeps reading ~ and keeps its profile layout — Reported
+A whole-tree rule on `~` turned the home folder into `<Rn>` and, because no name inside
+it was shown, into one line with only its size (D-074 saw this happen to 135 GB).
+"Keep well-known folder names" did not help: none of the profile's own folders were on
+the list, so the selector had nothing it could split on. Now:
+1. The current profile folder keeps reading `~` under a redaction, since `~` says
+   nothing about the user. It is still treated as redacted: no dates, counts or types on
+   its own lines (D-030), and every name inside stays hidden.
+2. The well-known list includes the standard profile layout on Windows, macOS and Linux
+   (`AppData`, `Local`, `Roaming`, `Documents`, `Downloads`, `Pictures`, `Videos`,
+   `Library`, `.config`, `.local`, `.cargo`, `.npm`...). These are the same on every PC.
+   With the option on (the default), a hidden home splits along them, for example
+   `~/AppData/Local/Temp`, `~/Videos` and a size-only `~/*` for the rest.
+3. The inspector's one-line warning now says what to do next: turn the option on, or,
+   when it is already on, use "Redact name, keep extension", which lists what is inside
+   by size under placeholders.
+Hidden names still never roll out of their folder's line one by one, so "whole subtree"
+keeps meaning that the structure of non-generic folders is not sent.

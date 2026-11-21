@@ -329,3 +329,39 @@ func TestContentAwareRollup(t *testing.T) {
 		t.Errorf("loose contents line missing:\n%s", lines)
 	}
 }
+
+// A home folder hidden as a whole tree used to become a single line with only a size, so
+// the assistant could only suggest keeping it. With well-known names kept, the profile
+// layout splits it into lines the assistant can act on, and nothing that is not
+// well-known is named (decision D-075).
+func TestHiddenHomeKeepsProfileLayout(t *testing.T) {
+	fixture := newFixture(t, []redact.Rule{{ID: "1", Type: redact.RuleSubtree,
+		Pattern: "~", Treatment: redact.TreatmentSubtree, KeepWellKnown: true}})
+	export := Build(fixture.result.Tree, fixture.redactor, "7KQX2M", DefaultOptions)
+	lines := strings.Join(dataLines(export.Batches[0].Text), "\n")
+	for _, expected := range []string{
+		"~/AppData/Local/Temp [900 files] m2025-03 {tmp}",
+		"~/Videos [25 files] m2019-06 {mp4}",
+	} {
+		if !strings.Contains(lines, expected) {
+			t.Errorf("hidden home lacks %q:\n%s", expected, lines)
+		}
+	}
+	// The rest of the home is listed by size only: its own name is redacted.
+	if !regexp.MustCompile(`(?m)^ \d+ \S+ ~/\*$`).MatchString(lines) {
+		t.Errorf("the rest of a hidden home should be a bare ~/* line:\n%s", lines)
+	}
+	for _, leaked := range []string{"projects", "kestrel", "alpha", "Vendor", "archive",
+		"blob", "<R"} {
+		if strings.Contains(lines, leaked) {
+			t.Errorf("hidden home leaks %q:\n%s", leaked, lines)
+		}
+	}
+
+	whole := newFixture(t, []redact.Rule{{ID: "1", Type: redact.RuleSubtree,
+		Pattern: "~", Treatment: redact.TreatmentSubtree}})
+	text := Build(whole.result.Tree, whole.redactor, "7KQX2M", DefaultOptions).Batches[0].Text
+	if got := dataLines(text); len(got) != 1 || !strings.HasSuffix(got[0], " ~") {
+		t.Errorf("without well-known names the home is one line reading ~, got %q", got)
+	}
+}

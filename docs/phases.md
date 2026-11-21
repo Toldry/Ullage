@@ -283,3 +283,7 @@ blocks only that entry), the age filter in results and the session, re-scan base
 in the guard and the session (accepted, kept, blocked again by a later change), prompt
 lines before and after a whole-tree redaction including the covering line, the rule
 match list, and a headless Chromium run of all of them.
+
+Afterwards (D-075): a whole-tree redaction of `~` keeps `~` and the standard profile
+layout. Tested: the home folder's rendering and metadata under a rule and a session
+override, and the prompt of a hidden home with and without well-known names.

@@ -295,3 +295,45 @@ func BenchmarkRedactorWithManyRedactedNames(b *testing.B) {
 			Registry: NewRegistry(nil, 1, true)})
 	}
 }
+
+// A rule on the home folder hides what is inside, but ~ itself says nothing about the
+// user, so it keeps reading ~ instead of becoming a placeholder. It still carries no
+// metadata, and the well-known profile layout stays readable (decision D-075).
+func TestRedactedHomeStaysTilde(t *testing.T) {
+	fixture := newFixture(t,
+		"/data/Users/mara/AppData/Local/Vendor/blob.bin",
+		"/data/Users/mara/clients/acme/plan.bin")
+	for _, treatment := range []Treatment{TreatmentSubtree, TreatmentKeepExtension} {
+		redactor := fixture.redactor([]Rule{{ID: "1", Type: RuleSubtree, Pattern: "~",
+			Treatment: treatment, KeepWellKnown: true}}, nil)
+		home := scannertest.Find(t, fixture.result, "/data/Users/mara")
+		if got := redactor.Render(home); got != "/data/Users/~" {
+			t.Errorf("%s: home renders as %q, want /data/Users/~", treatment, got)
+		}
+		if redactor.NameShown(home) {
+			t.Errorf("%s: a redacted home must not count as shown (no metadata)", treatment)
+		}
+		if state := redactor.State(home); state.Decision == DecisionVisible ||
+			state.Decision == DecisionHome {
+			t.Errorf("%s: home decision is %v, want a redaction", treatment, state.Decision)
+		}
+		clients := fixture.render(t, redactor, "/data/Users/mara/clients/acme/plan.bin")
+		if strings.Contains(clients, "clients") || strings.Contains(clients, "acme") ||
+			strings.Contains(clients, "plan") {
+			t.Errorf("%s: names inside the home leaked: %s", treatment, clients)
+		}
+	}
+	redactor := fixture.redactor([]Rule{{ID: "1", Type: RuleSubtree, Pattern: "~",
+		Treatment: TreatmentSubtree, KeepWellKnown: true}}, nil)
+	rendered := fixture.render(t, redactor, "/data/Users/mara/AppData/Local/Vendor/blob.bin")
+	if !regexp.MustCompile(`^/data/Users/~/AppData/Local/<R\d+>/<R\d+>$`).MatchString(rendered) {
+		t.Errorf("profile layout should stay readable inside a hidden home, got %s", rendered)
+	}
+	home := scannertest.Find(t, fixture.result, "/data/Users/mara")
+	overridden := fixture.redactor(nil, map[scanner.NodeIndex]Override{
+		home: {Treatment: TreatmentSubtree}})
+	if got := overridden.Render(home); got != "/data/Users/~" || overridden.NameShown(home) {
+		t.Errorf("a session override on home renders %q, shown=%v", got,
+			overridden.NameShown(home))
+	}
+}

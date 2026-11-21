@@ -451,8 +451,11 @@ function Inspector(props: {
           {detail.lineCount === 1 && item.kind === 'folder' && item.decision === 'subtree' &&
             item.hasChildren
             ? 'Hidden as a whole, so it is one line: the assistant sees only its size and ' +
-              'can only suggest keeping it. Keep well-known folder names, or hide less, ' +
-              'for a finer answer. '
+              'can only suggest keeping it. ' + (item.keepWellKnown
+                ? 'No well-known folder inside is large enough to list. "Redact name, keep ' +
+                  'extension" lists what is inside by size under placeholders. '
+                : 'Keep well-known folder names (AppData, Downloads, cache...) to let it ' +
+                  'be split, or hide less, for a finer answer. ')
             : ''}
           Exactly as copied, except that item numbers are assigned at export.
         </div>
@@ -489,8 +492,8 @@ function Inspector(props: {
             <span class="radio-text">
               <span class="strong-500">Keep well-known folder names inside</span>
               <span class="small muted">
-                <span class="mono">build, node_modules, cache, logs, renders</span> and similar
-                stay readable so the AI can recognize them.
+                <span class="mono">AppData, Downloads, build, node_modules, cache</span> and
+                similar stay readable so the AI can recognize them.
               </span>
             </span>
           </div>

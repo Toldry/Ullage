@@ -70,6 +70,17 @@ var wellKnownNames = map[string]bool{
 	".cache": true, "cache": true, "caches": true, "tmp": true, "temp": true, "logs": true,
 	"log": true, "backup": true, "backups": true, "packages": true, ".gradle": true,
 	".next": true, "coverage": true, "thumbnails": true, "proxies": true, "renders": true,
+	// The standard layout of a user profile, the same on every PC. Without these a hidden
+	// home folder could not be split at all, and became one line with only a size
+	// (decision D-075).
+	"appdata": true, "local": true, "locallow": true, "roaming": true, "desktop": true,
+	"documents": true, "downloads": true, "music": true, "pictures": true, "videos": true,
+	"movies": true, "saved games": true, "favorites": true, "onedrive": true,
+	"microsoft": true, "windows": true, "programs": true, "library": true,
+	"application support": true, "containers": true, ".local": true, "share": true,
+	".config": true, "trash": true, ".trash": true, "snap": true, ".npm": true,
+	".cargo": true, ".rustup": true, ".m2": true, ".nuget": true, ".docker": true,
+	".android": true, ".vscode": true, ".conda": true,
 }
 
 func isWellKnown(name string) bool {

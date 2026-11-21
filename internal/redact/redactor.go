@@ -40,7 +40,10 @@ type NodeState struct {
 	Decision Decision
 	Source   Source
 	// Rule is the index of the rule behind the decision, or -1.
-	Rule               int32
+	Rule int32
+	// redactedHome marks the current profile folder under a redaction: it still reads ~,
+	// which says nothing about the user, but it carries no metadata (decision D-075).
+	redactedHome       bool
 	hideBelow          bool
 	keepWellKnownBelow bool
 	keepExtensionBelow bool
@@ -225,7 +228,9 @@ func (redactor *Redactor) decideNode(index scanner.NodeIndex, node *scanner.Node
 	}
 
 	if override, found := overrides[index]; found {
-		return applyTreatment(override.Treatment, override.KeepWellKnown, SourceSession, -1)
+		state := applyTreatment(override.Treatment, override.KeepWellKnown, SourceSession, -1)
+		state.redactedHome = isHome(accepted) && state.Decision != DecisionVisible
+		return state
 	}
 	if ruleIndex := redactor.firstMatchingRule(index, node, accepted, nameRules,
 		anchored); ruleIndex >= 0 {
@@ -234,20 +239,28 @@ func (redactor *Redactor) decideNode(index scanner.NodeIndex, node *scanner.Node
 		state.keepExtensionBelow = rule.Type == RuleSubtree &&
 			rule.Treatment == TreatmentKeepExtension
 		redactor.recordMatch(index, node, ruleIndex)
+		state.redactedHome = isHome(accepted) && state.Decision != DecisionVisible
 		return state
 	}
 	if none.Decision != DecisionVisible {
 		return none
 	}
-	for _, owner := range accepted {
-		if owner == homeOwner {
-			return NodeState{Decision: DecisionHome, Rule: -1}
-		}
+	if isHome(accepted) {
+		return NodeState{Decision: DecisionHome, Rule: -1}
 	}
 	if redactor.containsAlwaysRedacted(node.Name) {
 		return applyTreatment(TreatmentKeepExtension, false, SourceAlways, -1)
 	}
 	return none
+}
+
+func isHome(accepted []int32) bool {
+	for _, owner := range accepted {
+		if owner == homeOwner {
+			return true
+		}
+	}
+	return false
 }
 
 func applyTreatment(treatment Treatment, keepWellKnown bool, source Source,
@@ -383,11 +396,17 @@ func (redactor *Redactor) RenderName(index scanner.NodeIndex) string {
 // NameShown reports whether the node's own name appears as-is in prompts, which is what
 // decides whether its metadata may be sent (decision D-030).
 func (redactor *Redactor) NameShown(index scanner.NodeIndex) bool {
+	if redactor.states[index].redactedHome {
+		return false
+	}
 	return !strings.HasPrefix(redactor.RenderName(index), "<R")
 }
 
 func (redactor *Redactor) renderName(index scanner.NodeIndex, node *scanner.Node) string {
 	state := redactor.states[index]
+	if state.redactedHome {
+		return "~"
+	}
 	switch state.Decision {
 	case DecisionHome:
 		return "~"
