@@ -4,8 +4,9 @@ import { Checkbox, Kbd } from '../components/Controls';
 import { copyText } from '../lib/clipboard';
 import { formatBytes, formatCount, formatClock, pluralize } from '../lib/format';
 import {
-  itemKey, restKey, resultsApi, selectedTotals, selectionState,
-  toggleCategory, unchangedChoices, type Selection,
+  deselectAll, groupSelection, itemKey, restKey, resultsApi, selectAll, selectedTotals,
+  selectGroups, selectionState, toggleCategory, unchangedChoices, type SelectGroup,
+  type Selection,
 } from '../lib/results';
 import type { ResultCategory, ResultItem, ResultsView } from '../lib/types';
 
@@ -72,6 +73,14 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
     if (category.selectable) onSelectionChange(toggleCategory(category, selection));
   }, [selection, onSelectionChange]);
 
+  // "Select all" acts on the listed deletable rows of a group, so the filters decide what
+  // it reaches; categories that can't be selected are skipped (D-076).
+  const toggleGroup = useCallback((group: ResultCategory[]) => {
+    const { state } = groupSelection(group, selection);
+    onSelectionChange(state === 'on' ? deselectAll(group, selection)
+      : selectAll(group, selection));
+  }, [selection, onSelectionChange]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
@@ -82,6 +91,7 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
       else if (event.key === 'k') setFocused(Math.max(focused - 1, 0));
       else if (event.key === 'Enter' && target.tagName !== 'BUTTON') void toggleExpand(current);
       else if (event.key === 'x') toggleSelected(current);
+      else if (event.key === 'a') toggleGroup(rows);
       else if ((event.key === 'd' || event.key === 'D') && selection.size > 0) {
         onReviewDeletion();
       } else return;
@@ -209,6 +219,11 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
         </div>
       )}
 
+      {rows.length > 0 && (
+        <SelectAllBar groups={selectGroups(rows)} selection={selection}
+          onToggle={toggleGroup} />
+      )}
+
       {allRows.length > 0 && (
         <div class="results-table" role="table" aria-label="Categories">
           <div class="results-row results-head" role="row">
@@ -254,8 +269,42 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
           {unchangedChoices.find((choice) => choice.days === view.unchangedDays)?.since ??
             `the last ${view.unchangedDays} days`} (hidden by the filter)
         </>}
-. Keys: j / k move, Enter expand, x select, D review deletion.
+. Keys: j / k move, Enter expand, x select, a select all shown, D review deletion.
       </div>
+    </div>
+  );
+}
+
+function SelectAllBar(props: {
+  groups: SelectGroup[];
+  selection: Selection;
+  onToggle: (categories: ResultCategory[]) => void;
+}) {
+  const shown = props.groups[0];
+  const skipped = shown.categories.length - groupSelection(shown.categories,
+    props.selection).selectable;
+  return (
+    <div class="results-select-bar" role="group" aria-label="Select all">
+      {props.groups.map((group) => {
+        const { selectable, state } = groupSelection(group.categories, props.selection);
+        const suffix = group.noun ? ` ${group.noun}` : '';
+        return (
+          <button type="button" key={group.key} class="button button-small"
+            disabled={selectable === 0} aria-pressed={state === 'on'}
+            onClick={() => props.onToggle(group.categories)}
+            title={selectable === 0 ? 'None of these categories can be selected' : undefined}>
+            {state === 'on' ? `Deselect${suffix || ' all'}`
+              : `Select all${suffix}`}
+            <span class="cell-mono faint">{formatCount(selectable)}</span>
+          </button>
+        );
+      })}
+      {skipped > 0 && (
+        <span class="small faint">
+          {pluralize(skipped, 'category', 'categories')} that can't be selected yet{' '}
+          {skipped === 1 ? 'is' : 'are'} skipped.
+        </span>
+      )}
     </div>
   );
 }

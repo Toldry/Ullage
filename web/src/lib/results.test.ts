@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  pruneSelection, restKey, selectedTotals, selectionState, toggleCategory,
+  deselectAll, groupSelection, pruneSelection, restKey, selectAll, selectedTotals,
+  selectGroups, selectionState, toggleCategory,
 } from './results';
 import type { ResultCategory } from './types';
 
@@ -38,5 +39,46 @@ describe('result selection', () => {
     expect([...pruneSelection([open], selection)].sort()).toEqual(['ai:1|id:1', 'ai:1|id:2']);
     const locked = category('ai:1', { needsExpand: true, selectable: false });
     expect(pruneSelection([locked], selection).size).toBe(0);
+  });
+
+  it('selects all selectable categories of a group and skips the rest', () => {
+    const open = category('ai:1', { moreItems: 5, moreBytes: 500 });
+    const recipe = category('recipe:npm', { source: 'recipe', confidence: 'recipe' });
+    const kept = category('ai:2', { selectable: false });
+    const locked = category('ai:3', { needsExpand: true, selectable: false });
+    const group = [open, recipe, kept, locked];
+    const selected = selectAll(group, new Set(['other|id:1']));
+    expect(selectionState(open, selected)).toBe('on');
+    expect(selectionState(recipe, selected)).toBe('on');
+    expect(selectionState(kept, selected)).toBe('off');
+    expect(selectionState(locked, selected)).toBe('off');
+    expect(selected.has('other|id:1')).toBe(true);
+    expect(groupSelection(group, selected)).toEqual({ selectable: 2, state: 'on' });
+  });
+
+  it('reports a group as partly selected and clears only that group', () => {
+    const first = category('ai:1');
+    const second = category('ai:2');
+    const outside = category('recipe:npm', { source: 'recipe' });
+    const selection = selectAll([first, outside], new Set());
+    expect(groupSelection([first, second], selection))
+      .toEqual({ selectable: 2, state: 'partial' });
+    const cleared = deselectAll([first, second], selection);
+    expect(groupSelection([first, second], cleared).state).toBe('off');
+    expect(selectionState(outside, cleared)).toBe('on');
+  });
+
+  it('counts a group with nothing selectable as empty', () => {
+    const kept = category('ai:2', { selectable: false });
+    expect(groupSelection([kept], new Set())).toEqual({ selectable: 0, state: 'off' });
+    expect(selectAll([kept], new Set()).size).toBe(0);
+  });
+
+  it('offers source buttons only when both sources are listed', () => {
+    const ai = category('ai:1');
+    const recipe = category('recipe:npm', { source: 'recipe' });
+    expect(selectGroups([ai, recipe]).map((group) => group.key))
+      .toEqual(['shown', 'recipe', 'ai']);
+    expect(selectGroups([ai]).map((group) => group.key)).toEqual(['shown']);
   });
 });

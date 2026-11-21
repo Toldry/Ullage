@@ -2734,3 +2734,14 @@ h1 {
   padding: 10px 14px 12px;
   border-top: 1px solid var(--line);
 }
+
+.results-select-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.results-select-bar .cell-mono {
+  margin-left: 6px;
+}

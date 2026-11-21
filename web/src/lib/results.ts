@@ -48,6 +48,56 @@ export function toggleCategory(category: ResultCategory, selection: Selection): 
   return next;
 }
 
+// selectAll adds every item of the selectable categories among the given ones. Categories
+// that cannot be selected (kept by the AI, locked, unexplained, managed cleanup only) are
+// skipped, so a group's "Select all" never reaches them (D-076).
+export function selectAll(categories: ResultCategory[], selection: Selection): Set<string> {
+  const next = new Set(selection);
+  for (const category of categories) {
+    if (category.selectable) categoryKeys(category).forEach((key) => next.add(key));
+  }
+  return next;
+}
+
+// deselectAll removes every item of the given categories from the selection.
+export function deselectAll(categories: ResultCategory[], selection: Selection): Set<string> {
+  const next = new Set(selection);
+  for (const category of categories) categoryKeys(category).forEach((key) => next.delete(key));
+  return next;
+}
+
+// groupSelection sums up a group of categories for its "Select all" button: how many can be
+// selected, and whether all of those, some, or none are selected now.
+export function groupSelection(categories: ResultCategory[], selection: Selection):
+  { selectable: number; state: 'on' | 'off' | 'partial' } {
+  const states = categories.filter((category) => category.selectable)
+    .map((category) => selectionState(category, selection));
+  const state = states.length === 0 || states.every((entry) => entry === 'off') ? 'off'
+    : states.every((entry) => entry === 'on') ? 'on' : 'partial';
+  return { selectable: states.length, state };
+}
+
+export interface SelectGroup {
+  key: string;
+  // Words after "Select all" and "Deselect", e.g. "recipes".
+  noun: string;
+  categories: ResultCategory[];
+}
+
+// The groups offered a "Select all" button: everything listed, then each source. The source
+// buttons are left out when one source holds every listed row, since they would repeat the
+// first button.
+export function selectGroups(rows: ResultCategory[]): SelectGroup[] {
+  const recipes = rows.filter((category) => category.source === 'recipe');
+  const ai = rows.filter((category) => category.source === 'ai');
+  const groups: SelectGroup[] = [{ key: 'shown', noun: '', categories: rows }];
+  if (recipes.length > 0 && ai.length > 0) {
+    groups.push({ key: 'recipe', noun: 'recipes', categories: recipes },
+      { key: 'ai', noun: 'AI', categories: ai });
+  }
+  return groups;
+}
+
 export function selectedTotals(categories: ResultCategory[], selection: Selection) {
   let items = 0;
   let bytes = 0;

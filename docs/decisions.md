@@ -585,3 +585,14 @@ the list, so the selector had nothing it could split on. Now:
    by size under placeholders.
 Hidden names still never roll out of their folder's line one by one, so "whole subtree"
 keeps meaning that the structure of non-generic folders is not sent.
+
+### D-076: "Select all" buttons on the Delete list — Approved (owner request)
+Above the category list, "Select all" selects every listed deletable category, and when
+both recipe and AI categories are listed, "Select all recipes" and "Select all AI" select
+one source. Each button shows how many categories it would select and turns into
+"Deselect" once they all are. They act on the rows the filters list (source, confidence,
+regenerable, age), so what is selected is what is on screen. Categories that cannot be
+selected are skipped and counted in a note: the ones the AI suggests keeping (D-043,
+D-073), managed cleanup only, unexplained, and low-confidence rows not yet opened, so a
+bulk selection never unlocks what a single checkbox would not. Key `a` toggles "Select
+all". The confirmation step and its re-verification (step 6's second half) are unchanged.
