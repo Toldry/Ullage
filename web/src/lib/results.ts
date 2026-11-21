@@ -5,7 +5,20 @@ export const resultsApi = {
   get: () => api.get<ResultsView>('/api/results'),
   expand: (key: string) => api.post<ResultsView>('/api/results/expand', { key }),
   unchanged: (days: number) => api.post<ResultsView>('/api/results/unchanged', { days }),
+  // Turns "Delete anyway" on for an AI keep category (with the typed phrase) or off (D-078).
+  overrideKeep: (key: string, override: boolean, confirmation = '') =>
+    api.post<ResultsView>('/api/results/override-keep', { key, override, confirmation }),
 };
+
+// What the user types to delete a category the AI suggests keeping (D-078). The server
+// checks the same phrase.
+export const keepOverrideConfirmation = 'delete anyway';
+
+// Every category whose items can be in the selection: the deletable ones, and the keep
+// categories the user chose to delete anyway.
+export function selectionCategories(view: ResultsView): ResultCategory[] {
+  return [...view.categories, ...view.kept.filter((category) => category.keepOverridden)];
+}
 
 // The age filter's choices: list only items whose newest change is this old (D-071).
 export const unchangedChoices: { days: number; label: string; since: string }[] = [

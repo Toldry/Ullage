@@ -265,3 +265,86 @@ func TestRescanAcceptsChangedItems(t *testing.T) {
 		t.Fatalf("change after re-scan = %+v", blocked)
 	}
 }
+
+// Decision D-078: a category the AI suggests keeping is refused until the user types
+// "delete anyway" for it, and is refused again once the override is taken back, even for
+// a plan prepared while it was on.
+func TestDeleteAnywayOverridesTheAIKeep(t *testing.T) {
+	manager, lines, root := explainedFixture(t)
+	key := "ai:2|id:" + lines["clients"]
+	plan, err := prepareAndWait(t, manager, []string{key})
+	if err != nil || plan.Ready.Count != 0 || plan.Items[0].Status != StatusRejected ||
+		!strings.Contains(plan.Items[0].Reason, "Delete anyway") {
+		t.Fatalf("plan before the override = %+v %v", plan, err)
+	}
+	for _, wrong := range []string{"", "delete", "Delete anyway", "delete anyway "} {
+		if _, err := manager.OverrideKeep("ai:2", true, wrong); !errors.Is(err,
+			ErrKeepOverrideConfirmation) {
+			t.Fatalf("confirmation %q accepted: %v", wrong, err)
+		}
+	}
+	view, err := manager.OverrideKeep("ai:2", true, KeepOverrideConfirmation)
+	if clients := findCategory(view, "ai:2"); err != nil || !clients.KeepOverridden ||
+		!clients.Selectable || len(view.Kept) != 1 {
+		t.Fatalf("after the override: %+v %v", clients, err)
+	}
+	plan, err = prepareAndWait(t, manager, []string{key})
+	if err != nil || plan.Ready.Count != 1 || !plan.Items[0].KeepOverridden {
+		t.Fatalf("plan after the override = %+v %v", plan, err)
+	}
+
+	// Taking the override back makes the prepared plan delete nothing.
+	view, err = manager.OverrideKeep("ai:2", false, "")
+	if clients := findCategory(view, "ai:2"); err != nil || clients.KeepOverridden ||
+		clients.Selectable {
+		t.Fatalf("after taking it back: %+v %v", clients, err)
+	}
+	if _, err := manager.ExecuteDeletion(ExecuteRequest{PlanID: plan.ID}); !errors.Is(err,
+		ErrNothingReady) {
+		t.Fatalf("execute after taking the override back: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "clients")); err != nil {
+		t.Fatalf("a kept folder was touched: %v", err)
+	}
+
+	// With the override on again, the deletion goes through.
+	if _, err := manager.OverrideKeep("ai:2", true, KeepOverrideConfirmation); err != nil {
+		t.Fatal(err)
+	}
+	plan, _ = prepareAndWait(t, manager, []string{key})
+	if _, err := manager.ExecuteDeletion(ExecuteRequest{PlanID: plan.ID, Permanent: true,
+		Confirmation: plan.Confirmation}); err != nil {
+		t.Fatal(err)
+	}
+	if run := waitForDeletion(t, manager); run.Removed.Count != 1 ||
+		!run.Items[0].KeepOverridden {
+		t.Fatalf("run = %+v", run)
+	}
+}
+
+// The override is only for the AI's keep categories, and it lapses when the batch is
+// imported again.
+func TestDeleteAnywayIsOnlyForKeepCategories(t *testing.T) {
+	manager, view, _ := importedFixture(t)
+	if _, err := manager.OverrideKeep("ai:3", true, KeepOverrideConfirmation); !errors.Is(
+		err, ErrNotKept) {
+		t.Fatalf("override of a deletable category: %v", err)
+	}
+	if _, err := manager.OverrideKeep("ai:99", true, KeepOverrideConfirmation); !errors.Is(
+		err, ErrNoSuchCategory) {
+		t.Fatalf("override of an unknown category: %v", err)
+	}
+	if _, err := manager.OverrideKeep("ai:2", true, KeepOverrideConfirmation); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := manager.Paste(PasteRequest{Batch: 1,
+		Text: replyFor(view.Code, view.Batches[0].Text)}); !again.Imported {
+		t.Fatalf("re-import failed: %+v", again)
+	}
+	results, _ := manager.Results()
+	for _, category := range results.Kept {
+		if category.KeepOverridden || category.Selectable {
+			t.Fatalf("override survived a re-import: %+v", category)
+		}
+	}
+}

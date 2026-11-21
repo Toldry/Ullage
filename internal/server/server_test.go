@@ -154,7 +154,8 @@ func TestStateChangingEndpointsRejectGetAndQueryTokens(t *testing.T) {
 	for _, path := range []string{"/api/scan", "/api/scan/cancel", "/api/config",
 		"/api/quit", "/api/relaunch-elevated", "/api/redaction/override", "/api/rules/save",
 		"/api/rules/delete", "/api/rules/reset", "/api/export/rebuild", "/api/paste",
-		"/api/results/expand", "/api/results/unchanged", "/api/delete/prepare",
+		"/api/results/expand", "/api/results/override-keep", "/api/results/unchanged",
+		"/api/delete/prepare",
 		"/api/delete/execute", "/api/delete/stop", "/api/history/clear"} {
 		response := server.do(requestOptions{path: path, token: server.guard.apiToken})
 		if response.Code != http.StatusMethodNotAllowed {

@@ -489,6 +489,11 @@ function ItemRow({ item, active, afterRun }: { item: DeletionItem; active: boole
             Cloud-synced: also deleted from the cloud and your other devices.
           </span>
         )}
+        {item.keepOverridden && (
+          <span class="small warn-text">
+            ⚠ The AI suggested keeping this; you chose to delete it anyway.
+          </span>
+        )}
         {item.warning && (
           <span class="small warn-text" title={item.warning}>
             ⚠ Managed cleanup preferred; see the warning below the list.

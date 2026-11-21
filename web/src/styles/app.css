@@ -2745,3 +2745,20 @@ h1 {
 .results-select-bar .cell-mono {
   margin-left: 6px;
 }
+
+/* "Delete anyway" on a category the AI suggests keeping (D-078). */
+.keep-override {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--warn-bd);
+  background: var(--warn-bg);
+  border-radius: 5px;
+}
+
+.row-gap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}

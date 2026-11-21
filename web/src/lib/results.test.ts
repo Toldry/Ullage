@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   deselectAll, groupSelection, pruneSelection, restKey, selectAll, selectedTotals,
-  selectGroups, selectionState, toggleCategory,
+  selectGroups, selectionCategories, selectionState, toggleCategory,
 } from './results';
-import type { ResultCategory } from './types';
+import type { ResultCategory, ResultsView } from './types';
 
 function category(key: string, overrides: Partial<ResultCategory> = {}): ResultCategory {
   return {
@@ -80,5 +80,31 @@ describe('result selection', () => {
     expect(selectGroups([ai, recipe]).map((group) => group.key))
       .toEqual(['shown', 'recipe', 'ai']);
     expect(selectGroups([ai]).map((group) => group.key)).toEqual(['shown']);
+  });
+});
+
+describe('delete anyway (D-078)', () => {
+  const view = (kept: ResultCategory[]) => ({ categories: [category('ai:1')], kept }) as
+    unknown as ResultsView;
+
+  it('only offers overridden keep categories for selection', () => {
+    const kept = category('ai:2', { selectable: false, bruteForce: { allowed: false } });
+    expect(selectionCategories(view([kept])).map((entry) => entry.key)).toEqual(['ai:1']);
+    const overridden = { ...kept, selectable: true, keepOverridden: true };
+    expect(selectionCategories(view([overridden])).map((entry) => entry.key))
+      .toEqual(['ai:1', 'ai:2']);
+  });
+
+  it('drops a keep category from the selection once it is kept again', () => {
+    const overridden = category('ai:2', { keepOverridden: true });
+    const selection = toggleCategory(overridden, new Set());
+    const keptAgain = { ...overridden, keepOverridden: false, selectable: false };
+    expect(pruneSelection(selectionCategories(view([overridden])), selection).size).toBe(2);
+    expect(pruneSelection(selectionCategories(view([keptAgain])), selection).size).toBe(0);
+  });
+
+  it('lets select all skip keep categories unless overridden', () => {
+    const kept = category('ai:2', { selectable: false });
+    expect(selectAll([category('ai:1'), kept], new Set()).has('ai:2|id:1')).toBe(false);
   });
 });

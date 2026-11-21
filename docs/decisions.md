@@ -260,6 +260,7 @@ runs and symbols; expect ±30%. A typical mixed PC (320 GB Unknown) produced 108
 ## Results and round B (Phase 4)
 
 ### D-043: What the Results list contains — Reported (Phase 4)
+(Partly superseded by D-078: `del 0` rows can be selected after "Delete anyway".)
 - Recipe categories: one per recipe, summing the Known bytes of every place its claims
   start. Bytes of a nested claim (a recipe path inside another recipe's) count only for
   the nested one. Installed applications are left out (their recipe says keep), and so
@@ -554,6 +555,7 @@ blocks it again (safety rule 6 is measured from the latest look, never skipped).
 Baselines last for the scan and are dropped by a new scan.
 
 ### D-073: Categories to keep are always listed — Approved (owner request)
+(Partly superseded by D-078: they can be selected after "Delete anyway".)
 The Delete list shows the AI's "keep" categories under their own heading after the
 deletable ones, instead of behind a link in the footer. They still cannot be selected.
 
@@ -596,3 +598,22 @@ selected are skipped and counted in a note: the ones the AI suggests keeping (D-
 D-073), managed cleanup only, unexplained, and low-confidence rows not yet opened, so a
 bulk selection never unlocks what a single checkbox would not. Key `a` toggles "Select
 all". The confirmation step and its re-verification (step 6's second half) are unchanged.
+
+### D-078: "Delete anyway" for categories the AI suggests keeping — Approved (owner request)
+Supersedes the "cannot be selected" part of D-043 and D-073. A category the AI marked
+`del 0` stays under "The AI suggests keeping", unselectable, until the user opens its row,
+chooses "Delete anyway…", and types `delete anyway` exactly. The server checks the phrase
+(`POST /api/results/override-keep`), records the override for that category, and from
+then on the row can be selected like a deletable one: its checkboxes, its own "Select
+all", and the D-077 "Select all" buttons, which still skip every keep category without the
+override. "Keep again" takes the override back and drops its items from the selection;
+a plan prepared before that deletes nothing of it, because execution resolves the
+selection again. An override lasts for the export: importing the batch again gives the
+category a new number, and the override lapses with it.
+Only the "keep" guard is relaxed. A keep row needs no explanation (the AI is not asked
+for one), so the typed phrase stands in for D-050's. Everything else applies unchanged:
+low-confidence rows must be opened, the age filter (D-071) now applies to the category,
+managed-cleanup-only recipes cannot be overridden, and every safety check, the Recycle
+Bin default and the typed confirmation for permanent deletion still run at step 6. The
+row, the confirmation list and the deletion progress mark these items "deleting anyway"
+so the choice stays visible until the end.

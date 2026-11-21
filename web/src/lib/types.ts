@@ -316,6 +316,8 @@ export interface ResultCategory {
   cloudSyncItems: number;
   notLocalBytes: number;
   selectable: boolean;
+  // An AI "keep" category the user chose to delete anyway (D-078).
+  keepOverridden?: boolean;
   tooRecentItems?: number;
   tooRecentBytes?: number;
 }
@@ -358,6 +360,8 @@ export interface DeletionItem {
   warning?: string;
   // Read again by a re-scan; bytes is then its size at the re-scan.
   rescanned?: boolean;
+  // The AI suggested keeping it; the user chose "Delete anyway" (D-078).
+  keepOverridden?: boolean;
 }
 
 export interface Tally {

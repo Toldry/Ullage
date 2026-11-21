@@ -74,6 +74,8 @@ type DeletionItem struct {
 	// Rescanned: the item was read again and is checked against that state, not the
 	// scan's; Bytes is then its size at the re-scan.
 	Rescanned bool `json:"rescanned,omitempty"`
+	// KeepOverridden: the AI suggested keeping it and the user chose to delete it anyway.
+	KeepOverridden bool `json:"keepOverridden,omitempty"`
 }
 
 // Tally counts items and bytes.
@@ -175,7 +177,7 @@ func (manager *Manager) resolveSelection(keys []string) ([]DeletionItem,
 			entry := DeletionItem{Key: full, Category: category.Key,
 				CategoryName: category.Name, Path: item.Path, Kind: item.Kind,
 				Bytes: item.Bytes, CloudSync: item.CloudSync,
-				Warning: category.BruteForce.Warning}
+				Warning: category.BruteForce.Warning, KeepOverridden: category.KeepOverridden}
 			if baseline, found := manager.deletion.baselines[baselineKey(target)]; found {
 				target.Baseline = &baseline
 				entry.Rescanned, entry.Bytes = true, baseline.LogicalBytes
@@ -200,7 +202,7 @@ func refusalReason(category results.Category) string {
 	case !category.BruteForce.Allowed && category.Source == results.SourceRecipe:
 		return "this recipe offers managed cleanup only: " + category.BruteForce.Reason
 	case !category.BruteForce.Allowed:
-		return "the AI suggests keeping these"
+		return "the AI suggests keeping these; choose \"Delete anyway\" on its row first"
 	case category.NeedsExplanation:
 		return "the AI reply did not explain this category"
 	case category.NeedsExpand:

@@ -140,6 +140,8 @@ func (server *Server) apiRoutes() map[string]route {
 			maximumBodyBytes: maximumPasteBytes},
 		"/api/results":        {method: http.MethodGet, handler: server.handleResults},
 		"/api/results/expand": {method: http.MethodPost, handler: server.handleExpand},
+		"/api/results/override-keep": {method: http.MethodPost,
+			handler: server.handleOverrideKeep},
 		"/api/results/unchanged": {method: http.MethodPost,
 			handler: server.handleUnchangedFilter},
 		"/api/delete/prepare": {method: http.MethodPost, handler: server.handlePrepareDeletion,
