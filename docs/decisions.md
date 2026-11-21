@@ -468,8 +468,9 @@ on first run. A manual run rehearses everything without publishing.
 Every push to `main` that changes the program publishes a release; pushes that touch
 only `docs/`, `AGENTS.md` or the CI workflow do not. A first job on Linux picks the
 version: the highest stable `vX.Y.Z` tag with its patch number bumped, or its minor or
-major number when a commit since that tag says `[minor]` or `[major]`. The head commit
-saying `[skip release]`, or already carrying a `v*` tag, skips the release. The Windows
+major number when a commit since that tag has `[minor]` or `[major]` in its subject
+line (bodies are ignored, so they can mention the markers). The head commit with
+`[skip release]` in its subject, or already carrying a `v*` tag, skips the release. The Windows
 job then runs exactly as for a pushed tag (D-065) and `gh release create --target`
 creates the tag on the commit it built; a tag made with the workflow's token starts no
 further run. Pushing a tag by hand still publishes that exact version, which is how

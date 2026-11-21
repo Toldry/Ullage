@@ -128,9 +128,10 @@ and `arm64` executables, smoke-tests one, packages zips with the README and
 repository only) and publishes the GitHub Release with notes listing the changes.
 
 The version comes from the highest `vX.Y.Z` tag. Each release bumps the patch number by
-default. Words in a commit message (any commit since the last release) change that:
+default. Markers in a commit's subject line (any commit since the last release) change
+that; the message body is ignored, so it can mention them freely:
 
-| In a commit message | Effect                      |
+| In a subject line   | Effect                      |
 | ------------------- | --------------------------- |
 | `[minor]`           | `0.1.4` → `0.2.0`           |
 | `[major]`           | `0.1.4` → `1.0.0`           |

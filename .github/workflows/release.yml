@@ -33,9 +33,10 @@ concurrency:
 jobs:
   # Decides the version. A pushed tag is used as is. A push to main takes the highest
   # stable tag (vX.Y.Z) and bumps it: the patch number by default, the minor number if a
-  # commit since that tag says [minor] in its message, the major number for [major]. A
-  # head commit that says [skip release], or that already carries a v* tag, publishes
-  # nothing.
+  # commit since that tag has [minor] in its subject line, the major number for [major].
+  # A head commit with [skip release] in its subject line, or that already carries a v*
+  # tag, publishes nothing. Only subject lines count, so a message body can mention the
+  # markers freely.
   version:
     runs-on: ubuntu-latest
     outputs:
@@ -58,7 +59,7 @@ jobs:
           elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             version="${GITHUB_REF_NAME#v}"
           else
-            if git log -1 --format=%B | grep -qiF "[skip release]"; then
+            if git log -1 --format=%s | grep -qiF "[skip release]"; then
               echo "The head commit says [skip release]."
               echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
             fi
@@ -72,10 +73,10 @@ jobs:
               version="0.1.0"
             else
               IFS=. read -r major minor patch <<< "${last#v}"
-              messages=$(git log "$last..HEAD" --format=%B)
-              if grep -qiF "[major]" <<< "$messages"; then
+              subjects=$(git log "$last..HEAD" --format=%s)
+              if grep -qiF "[major]" <<< "$subjects"; then
                 version="$((major + 1)).0.0"
-              elif grep -qiF "[minor]" <<< "$messages"; then
+              elif grep -qiF "[minor]" <<< "$subjects"; then
                 version="$major.$((minor + 1)).0"
               else
                 version="$major.$minor.$((patch + 1))"
