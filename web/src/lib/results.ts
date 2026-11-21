@@ -50,7 +50,7 @@ export function toggleCategory(category: ResultCategory, selection: Selection): 
 
 // selectAll adds every item of the selectable categories among the given ones. Categories
 // that cannot be selected (kept by the AI, locked, unexplained, managed cleanup only) are
-// skipped, so a group's "Select all" never reaches them (D-076).
+// skipped, so a group's "Select all" never reaches them (D-077).
 export function selectAll(categories: ResultCategory[], selection: Selection): Set<string> {
   const next = new Set(selection);
   for (const category of categories) {

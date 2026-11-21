@@ -74,7 +74,7 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
   }, [selection, onSelectionChange]);
 
   // "Select all" acts on the listed deletable rows of a group, so the filters decide what
-  // it reaches; categories that can't be selected are skipped (D-076).
+  // it reaches; categories that can't be selected are skipped (D-077).
   const toggleGroup = useCallback((group: ResultCategory[]) => {
     const { state } = groupSelection(group, selection);
     onSelectionChange(state === 'on' ? deselectAll(group, selection)

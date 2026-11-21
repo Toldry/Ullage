@@ -586,7 +586,7 @@ the list, so the selector had nothing it could split on. Now:
 Hidden names still never roll out of their folder's line one by one, so "whole subtree"
 keeps meaning that the structure of non-generic folders is not sent.
 
-### D-076: "Select all" buttons on the Delete list — Approved (owner request)
+### D-077: "Select all" buttons on the Delete list — Approved (owner request)
 Above the category list, "Select all" selects every listed deletable category, and when
 both recipe and AI categories are listed, "Select all recipes" and "Select all AI" select
 one source. Each button shows how many categories it would select and turns into
