@@ -1,4 +1,5 @@
-import { defineConfig } from 'vite';
+// vitest/config re-exports Vite's defineConfig with the `test` key typed (Vitest 4+).
+import { defineConfig } from 'vitest/config';
 import preact from '@preact/preset-vite';
 
 export default defineConfig({
