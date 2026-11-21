@@ -4,7 +4,7 @@ import { Checkbox, Kbd } from '../components/Controls';
 import { copyText } from '../lib/clipboard';
 import { formatBytes, formatCount, formatClock, pluralize } from '../lib/format';
 import {
-  deselectAll, groupSelection, itemKey, keepOverrideConfirmation, restKey, resultsApi,
+  deselectAll, groupSelection, itemKey, restKey, resultsApi,
   selectAll, selectedTotals, selectGroups, selectionCategories, selectionState,
   toggleCategory, unchangedChoices, type SelectGroup, type Selection,
 } from '../lib/results';
@@ -56,7 +56,7 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
     (confidence === 'any' || category.confidence === confidence) &&
     (regenerable === 'any' || category.regenerable === regenerable));
   const allRows = [...rows, ...keptRows];
-  // "Select all" reaches keep categories only once "Delete anyway" is on for them (D-078).
+  // "Select all" reaches keep categories only while deleting them is allowed (D-078).
   const selectRows = [...rows, ...keptRows.filter((category) => category.keepOverridden)];
 
   const toggleExpand = useCallback(async (category: ResultCategory) => {
@@ -221,9 +221,10 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
         </div>
       )}
 
-      {selectRows.length > 0 && (
+      {(selectRows.length > 0 || view.kept.length > 0) && (
         <SelectAllBar groups={selectGroups(selectRows)} selection={selection}
-          onToggle={toggleGroup} />
+          onToggle={toggleGroup} keptCount={view.kept.length} allowKept={view.allowKept}
+          onAllowKept={async (allow) => accept(await guard(resultsApi.allowKept(allow)))} />
       )}
 
       {allRows.length > 0 && (
@@ -239,8 +240,9 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
                 <span class="strong-500">The AI suggests keeping</span>
                 <span class="small muted">
                   {formatBytes(keptBytes)} in {pluralize(view.kept.length, 'category',
-                    'categories')} · listed so you can see them; open a row and choose
-                  “Delete anyway” to select one
+                    'categories')} · {view.allowKept
+                    ? 'deleting them is allowed; select with care'
+                    : 'listed so you can see them; they can\'t be selected'}
                 </span>
               </div>
             )}
@@ -252,12 +254,6 @@ export function ResultsScreen({ guard, selection, onSelectionChange, onResultsLo
               onFocus={() => setFocused(index)}
               onToggleExpand={() => void toggleExpand(category)}
               onToggleSelected={() => toggleSelected(category)}
-              onOverrideKeep={async (override, confirmation) => {
-                const loaded = await guard(resultsApi.overrideKeep(category.key, override,
-                  confirmation));
-                accept(loaded);
-                return loaded !== undefined;
-              }}
               onToggleItem={(key) => {
                 const next = new Set(selection);
                 if (next.has(key)) next.delete(key);
@@ -288,6 +284,9 @@ function SelectAllBar(props: {
   groups: SelectGroup[];
   selection: Selection;
   onToggle: (categories: ResultCategory[]) => void;
+  keptCount: number;
+  allowKept: boolean;
+  onAllowKept: (allow: boolean) => void;
 }) {
   const shown = props.groups[0];
   const skipped = shown.categories.length - groupSelection(shown.categories,
@@ -312,6 +311,18 @@ function SelectAllBar(props: {
         <span class="small faint">
           {pluralize(skipped, 'category', 'categories')} that can't be selected yet{' '}
           {skipped === 1 ? 'is' : 'are'} skipped.
+        </span>
+      )}
+      {props.keptCount > 0 && (
+        <span class="allow-kept">
+          {props.allowKept && (
+            <span class="small warn-text">⚠ Deleting against AI recommendation is on.</span>
+          )}
+          <button type="button" class={`button button-small${props.allowKept ? ''
+            : ' button-warn'}`} aria-pressed={props.allowKept}
+            onClick={() => props.onAllowKept(!props.allowKept)}>
+            {props.allowKept ? 'Stop allowing' : 'Allow deleting against AI recommendation'}
+          </button>
         </span>
       )}
     </div>
@@ -367,7 +378,6 @@ function CategoryRow(props: {
   onToggleExpand: () => void;
   onToggleSelected: () => void;
   onToggleItem: (key: string) => void;
-  onOverrideKeep: (override: boolean, confirmation?: string) => Promise<boolean>;
 }) {
   const { category } = props;
   const state = selectionState(category, props.selection);
@@ -375,7 +385,7 @@ function CategoryRow(props: {
   const checkboxTitle = category.keepOverridden
     ? (category.needsExpand ? 'Expand the row to enable delete'
       : 'The AI suggests keeping these; you chose to delete them anyway')
-    : props.kept ? 'The AI suggests keeping these; open the row to delete them anyway'
+    : props.kept ? 'The AI suggests keeping these'
     : !category.bruteForce.allowed ? 'Managed cleanup only'
       : category.needsExplanation ? 'The AI reply did not explain this category'
         : category.needsExpand ? 'Expand the row to enable delete' : 'Select for deletion';
@@ -463,7 +473,7 @@ function RowAction(props: { category: ResultCategory; kept: boolean }) {
   const { category } = props;
   if (category.keepOverridden) {
     return <span class="warn-text">{category.needsExpand ? 'Expand to enable delete'
-      : 'Delete anyway is on'}</span>;
+      : 'Against AI advice'}</span>;
   }
   if (props.kept) return <span class="faint">AI suggests keeping</span>;
   if (!category.bruteForce.allowed) return <span class="faint">Managed cleanup only</span>;
@@ -488,7 +498,6 @@ function CategoryDetail(props: {
   selection: Selection;
   onToggleSelected: () => void;
   onToggleItem: (key: string) => void;
-  onOverrideKeep: (override: boolean, confirmation?: string) => Promise<boolean>;
 }) {
   const { category } = props;
   const explanation = category.explanation;
@@ -557,8 +566,8 @@ function CategoryDetail(props: {
             Without an explanation these items can't be selected.
           </div>
         ) : props.kept ? (
-          <DeleteAnyway category={category} state={state}
-            onOverrideKeep={props.onOverrideKeep} onToggleSelected={props.onToggleSelected} />
+          <KeptCleanup category={category} state={state}
+            onToggleSelected={props.onToggleSelected} />
         ) : category.bruteForce.allowed ? (
           <div class="cleanup-box">
             <div class="between">
@@ -624,90 +633,48 @@ function CategoryDetail(props: {
   );
 }
 
-// DeleteAnyway is the keep row's brute-force box: "Delete anyway" asks for a typed phrase
-// before the row can be selected, and "Keep again" puts the guard back (D-078).
-function DeleteAnyway(props: {
+// KeptCleanup is the brute-force box of a category the AI suggests keeping: not offered,
+// unless deleting against the AI's recommendation is allowed at the top (D-078).
+function KeptCleanup(props: {
   category: ResultCategory;
   state: 'on' | 'off' | 'partial';
-  onOverrideKeep: (override: boolean, confirmation?: string) => Promise<boolean>;
   onToggleSelected: () => void;
 }) {
   const { category } = props;
-  const [asking, setAsking] = useState(false);
-  const [typed, setTyped] = useState('');
-  if (category.keepOverridden) {
+  if (!category.keepOverridden) {
     return (
-      <div class="cleanup-box">
+      <div class="cleanup-box dashed">
         <div class="between">
-          <span class="strong">Brute force</span>
-          <span class="small faint">to Recycle Bin</span>
+          <span class="strong muted">Brute force</span>
+          <span class="cell-mono faint">not offered</span>
         </div>
-        <div class="brute-warning small" role="note">
-          <span class="warn-text strong">⚠ The AI suggests keeping these.</span>{' '}
-          You chose to delete them anyway. Every item is checked again before it is
-          deleted, and you confirm the list once more on the next step.
-        </div>
-        {category.needsExpand && (
-          <div class="small muted">Low confidence: this row unlocks once it is open.</div>
-        )}
-        <div class="row-gap">
-          <button type="button" class="button button-small"
-            disabled={!category.selectable} onClick={props.onToggleSelected}>
-            {props.state === 'on' ? 'Deselect all' : `Select all ${formatCount(
-              category.itemCount)}`}
-          </button>
-          <button type="button" class="link-button small"
-            onClick={() => void props.onOverrideKeep(false)}>
-            Keep again
-          </button>
+        <div class="small muted">
+          The AI marked these as files most people would want to keep. To delete them
+          anyway, use “Allow deleting against AI recommendation” above the list.
         </div>
       </div>
     );
   }
-  const matches = typed === keepOverrideConfirmation;
   return (
-    <div class="cleanup-box dashed">
+    <div class="cleanup-box">
       <div class="between">
-        <span class="strong muted">Brute force</span>
-        <span class="cell-mono faint">not offered</span>
+        <span class="strong">Brute force</span>
+        <span class="small faint">to Recycle Bin</span>
       </div>
-      <div class="small muted">
-        The AI marked these as files most people would want to keep.
+      <div class="brute-warning small" role="note">
+        <span class="warn-text strong">⚠ The AI suggests keeping these.</span>{' '}
+        Check the items on the right before selecting them.
       </div>
-      {!asking ? (
-        <div>
-          <button type="button" class="link-button small" onClick={() => setAsking(true)}>
-            Delete anyway…
-          </button>
-        </div>
-      ) : (
-        <form class="keep-override" onSubmit={async (event) => {
-          event.preventDefault();
-          if (matches && await props.onOverrideKeep(true, typed)) {
-            setAsking(false);
-            setTyped('');
-          }
-        }}>
-          <div class="small">
-            Check the items on the right first: the AI judged that losing them would hurt.
-            Type <span class="mono strong">{keepOverrideConfirmation}</span> to make
-            “{category.name}” selectable.
-          </div>
-          <input class="confirm-input" value={typed} placeholder={keepOverrideConfirmation}
-            aria-label="Confirm delete anyway" autoComplete="off" spellcheck={false}
-            onInput={(event) => setTyped((event.target as HTMLInputElement).value)} />
-          <div class="row-gap">
-            <button type="submit" class="button button-small button-danger"
-              disabled={!matches}>
-              Allow deleting
-            </button>
-            <button type="button" class="link-button small"
-              onClick={() => { setAsking(false); setTyped(''); }}>
-              Cancel
-            </button>
-          </div>
-        </form>
+      {category.needsExpand && (
+        <div class="small muted">Low confidence: this row unlocks once it is open.</div>
       )}
+      <div>
+        <button type="button" class="button button-small"
+          disabled={!category.selectable} onClick={props.onToggleSelected}>
+          {props.state === 'on' ? 'Deselect all' : `Select all ${formatCount(
+            category.itemCount)}`}
+        </button>
+      </div>
     </div>
   );
 }

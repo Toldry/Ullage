@@ -124,8 +124,8 @@ type Category struct {
 	CloudSyncItems int   `json:"cloudSyncItems"`
 	NotLocalBytes  int64 `json:"notLocalBytes"`
 	Selectable     bool  `json:"selectable"`
-	// KeepOverridden: an AI "keep" category the user chose to delete anyway, after typing
-	// the confirmation (decision D-078). It stays in the kept list but can be selected.
+	// KeepOverridden: an AI "keep" category made selectable by "Allow deleting against AI
+	// recommendation" (decision D-078). It stays in the kept list.
 	KeepOverridden bool `json:"keepOverridden,omitempty"`
 	// TooRecentItems and TooRecentBytes are what the age filter left out (D-071).
 	TooRecentItems int   `json:"tooRecentItems,omitempty"`
@@ -168,8 +168,8 @@ type Input struct {
 	Export         *prompt.Export
 	Imported       []ImportedCategory
 	Expanded       map[string]bool
-	// KeepOverridden holds keys of AI "keep" categories the user chose to delete anyway.
-	KeepOverridden map[string]bool
+	// AllowKept makes the AI's "keep" categories selectable (decision D-078).
+	AllowKept bool
 	// Deleted holds DeletedKey values of items deleted in this session; they are not
 	// listed again. Keys name scan nodes, so they stay valid when an export is rebuilt.
 	Deleted      map[string]bool
@@ -393,7 +393,7 @@ func buildAICategory(input Input, imported ImportedCategory, restorer *restorer)
 		category.Items = append(category.Items, withCloud(input.Tree, entry))
 	}
 	// An overridden keep category is offered for deletion, so the age filter applies.
-	category.KeepOverridden = !row.Deletable && input.KeepOverridden[category.Key]
+	category.KeepOverridden = !row.Deletable && input.AllowKept
 	if row.Deletable || category.KeepOverridden {
 		filterByAge(input, &category)
 	}
@@ -410,8 +410,9 @@ func buildAICategory(input Input, imported ImportedCategory, restorer *restorer)
 	category.NeedsExpand = row.Confidence == response.ConfidenceLow &&
 		!input.Expanded[category.Key]
 	category.NeedsExplanation = category.ExplanationState != ExplanationReceived
-	// A keep row has no explanation to read (the AI is not asked for one); the typed
-	// "delete anyway" confirmation stands in for it. Low confidence still needs opening.
+	// A keep row has no explanation to read (the AI is not asked for one); turning on
+	// "Allow deleting against AI recommendation" stands in for it. Low confidence still
+	// needs opening.
 	category.Selectable = (row.Deletable && !category.NeedsExplanation ||
 		category.KeepOverridden) && !category.NeedsExpand && category.Bytes > 0
 	return category

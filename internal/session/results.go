@@ -16,13 +16,12 @@ type categoryState struct {
 	// keeps its key when other batches are imported again.
 	nextNumber int
 	expanded   map[string]bool
-	// keepOverridden: AI "keep" categories the user chose to delete anyway (D-078).
-	keepOverridden map[string]bool
+	// allowKept: the user allowed deleting against the AI's recommendation (D-078).
+	allowKept bool
 }
 
 func newCategoryState() categoryState {
-	return categoryState{nextNumber: 1, expanded: map[string]bool{},
-		keepOverridden: map[string]bool{}}
+	return categoryState{nextNumber: 1, expanded: map[string]bool{}}
 }
 
 func (state *categoryState) allocateNumber() int {
@@ -37,7 +36,6 @@ func (state *categoryState) allocateNumber() int {
 func (state *categoryState) forget(numbers []int) {
 	for _, number := range numbers {
 		delete(state.expanded, results.AIKey(number))
-		delete(state.keepOverridden, results.AIKey(number))
 	}
 }
 
@@ -64,6 +62,8 @@ type ResultsView struct {
 	MinimumItemBytes int64  `json:"minimumItemBytes"`
 	// UnchangedDays is the age filter in effect; 0 when off.
 	UnchangedDays int `json:"unchangedDays"`
+	// AllowKept: "Allow deleting against AI recommendation" is on (D-078).
+	AllowKept bool `json:"allowKept"`
 }
 
 // Results merges recipe categories with the imported AI categories.
@@ -88,19 +88,19 @@ func (manager *Manager) resultsView() (ResultsView, error) {
 			}
 			return nil
 		},
-		Redactor:       state.redactor,
-		Export:         state.export,
-		Expanded:       state.categories.expanded,
-		KeepOverridden: state.categories.keepOverridden,
-		Deleted:        manager.deletion.deleted,
-		MinimumBytes:   manager.promptOptions().MinimumItemBytes,
-		Profile:        manager.CurrentProfile(),
+		Redactor:     state.redactor,
+		Export:       state.export,
+		Expanded:     state.categories.expanded,
+		AllowKept:    state.categories.allowKept,
+		Deleted:      manager.deletion.deleted,
+		MinimumBytes: manager.promptOptions().MinimumItemBytes,
+		Profile:      manager.CurrentProfile(),
 	}
 	if manager.unchangedDays > 0 {
 		input.UnchangedBefore = time.Now().AddDate(0, 0, -manager.unchangedDays).Unix()
 	}
 	view := ResultsView{MinimumItemBytes: input.MinimumBytes,
-		UnchangedDays: manager.unchangedDays}
+		UnchangedDays: manager.unchangedDays, AllowKept: input.AllowKept}
 	if state.export != nil {
 		view.Code = state.export.Code
 		view.BatchCount = len(state.export.Batches)
@@ -148,59 +148,22 @@ func (manager *Manager) MarkExpanded(key string) (ResultsView, error) {
 	return ResultsView{}, ErrNoSuchCategory
 }
 
-// KeepOverrideConfirmation is what the user types to delete a category the AI suggests
-// keeping (decision D-078).
-const KeepOverrideConfirmation = "delete anyway"
-
-// ErrKeepOverrideConfirmation means the typed confirmation did not match.
-var ErrKeepOverrideConfirmation = errors.New(
-	`type "` + KeepOverrideConfirmation + `" to delete what the AI suggests keeping`)
-
-// ErrNotKept means an override named a category that is not an AI "keep" category.
-var ErrNotKept = errors.New("only categories the AI suggests keeping can be overridden")
-
-// OverrideKeep lets the user select an AI "keep" category for deletion after typing
-// KeepOverrideConfirmation, or, with override false, puts the guard back. Nothing else
-// is relaxed: managed-only recipes, low-confidence rows that were not opened, the age
-// filter and every check at deletion time still apply.
-func (manager *Manager) OverrideKeep(key string, override bool,
-	confirmation string) (ResultsView, error) {
-	if override && confirmation != KeepOverrideConfirmation {
-		return ResultsView{}, ErrKeepOverrideConfirmation
-	}
+// SetAllowKept turns "Allow deleting against AI recommendation" on or off: while on, the
+// categories the AI suggests keeping can be selected (decision D-078). Nothing else is
+// relaxed: managed-only recipes, low-confidence rows that were not opened, the age
+// filter and every check at deletion time still apply. It lasts until turned off or a
+// new export.
+func (manager *Manager) SetAllowKept(allow bool) (ResultsView, error) {
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
-	view, err := manager.resultsView()
-	if err != nil {
-		return view, err
+	if manager.completed == nil {
+		return manager.resultsView()
 	}
-	if !isKept(view, key) {
-		for _, category := range view.Categories {
-			if category.Key == key {
-				return ResultsView{}, ErrNotKept
-			}
-		}
-		return ResultsView{}, ErrNoSuchCategory
+	if manager.exportState.categories.nextNumber == 0 {
+		manager.exportState.categories = newCategoryState()
 	}
-	state := &manager.exportState.categories
-	if state.keepOverridden == nil {
-		state.keepOverridden = map[string]bool{}
-	}
-	if override {
-		state.keepOverridden[key] = true
-	} else {
-		delete(state.keepOverridden, key)
-	}
+	manager.exportState.categories.allowKept = allow
 	return manager.resultsView()
-}
-
-func isKept(view ResultsView, key string) bool {
-	for _, category := range view.Kept {
-		if category.Key == key && category.Source == results.SourceAI {
-			return true
-		}
-	}
-	return false
 }
 
 // maximumUnchangedDays bounds the age filter to something a person could mean.

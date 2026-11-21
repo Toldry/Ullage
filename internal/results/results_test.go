@@ -407,25 +407,25 @@ func TestAgeFilter(t *testing.T) {
 	}
 }
 
-// Decision D-078: "delete anyway" makes an AI keep category selectable without an
-// explanation, keeps it in the kept list, and leaves the low-confidence lock in place.
-func TestKeepOverrideUnlocksOnlyTheKeepCategory(t *testing.T) {
+// Decision D-078: allowing deletion against the AI makes its keep categories selectable
+// without an explanation, keeps them in the kept list, and leaves the low-confidence lock.
+func TestAllowKeptUnlocksOnlyKeepCategories(t *testing.T) {
 	fixture := newFixture(t)
 	fixture.importRows(t)
 	fixture.input.Imported[2].Category.Deletable = false // a low-confidence keep row
 	if videos := byKey(Build(fixture.input), "ai:2"); videos.Selectable ||
 		videos.KeepOverridden {
-		t.Fatalf("keep category selectable without the override: %+v", videos)
+		t.Fatalf("keep category selectable without allowing: %+v", videos)
 	}
-	fixture.input.KeepOverridden = map[string]bool{"ai:1": true, "ai:2": true, "ai:3": true}
+	fixture.input.AllowKept = true
 	model := Build(fixture.input)
 	videos := byKey(model, "ai:2")
 	if !videos.Selectable || !videos.KeepOverridden || len(model.Kept) != 2 ||
-		model.Kept[0].Key == "" || byKey(model, "ai:1").KeepOverridden {
-		t.Fatalf("after the override: %+v", model)
+		byKey(model, "ai:1").KeepOverridden {
+		t.Fatalf("after allowing: %+v", model)
 	}
 	if strata := byKey(model, "ai:3"); strata.Selectable || !strata.NeedsExpand {
-		t.Fatalf("override skipped the low-confidence lock: %+v", strata)
+		t.Fatalf("allowing skipped the low-confidence lock: %+v", strata)
 	}
 	fixture.input.Expanded["ai:3"] = true
 	if strata := byKey(Build(fixture.input), "ai:3"); !strata.Selectable {

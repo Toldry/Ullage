@@ -291,8 +291,8 @@ conversation, in appropriate Markdown files.
   Delete step (D-071).
 - Items that changed since the scan can be re-scanned from the Delete step and
   confirmed at their new size (D-072).
-- Categories the AI suggests keeping are always listed (D-073); "Delete anyway" with a
-  typed confirmation makes one selectable (D-078).
+- Categories the AI suggests keeping are always listed (D-073); "Allow deleting against AI
+  recommendation" makes them all selectable (D-078).
 - The redaction review previews how the selected item reads in the copied prompt; a
   rule's full match list can be opened (D-074).
 - A home folder hidden as a whole tree still reads `~` and, with well-known names kept,

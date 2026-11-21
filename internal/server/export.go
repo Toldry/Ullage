@@ -49,13 +49,8 @@ func (server *Server) handlePaste(writer http.ResponseWriter, request *http.Requ
 }
 
 func writeResultsError(writer http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, session.ErrNoSuchCategory):
+	if errors.Is(err, session.ErrNoSuchCategory) {
 		writeJSONError(writer, http.StatusNotFound, err.Error())
-		return
-	case errors.Is(err, session.ErrKeepOverrideConfirmation),
-		errors.Is(err, session.ErrNotKept):
-		writeJSONError(writer, http.StatusBadRequest, err.Error())
 		return
 	}
 	writeJSONError(writer, http.StatusConflict, err.Error())
@@ -86,21 +81,16 @@ func (server *Server) handleExpand(writer http.ResponseWriter, request *http.Req
 	writeJSON(writer, http.StatusOK, view)
 }
 
-// handleOverrideKeep turns the "delete anyway" override of an AI keep category on (with
-// the typed confirmation) or off (decision D-078).
-func (server *Server) handleOverrideKeep(writer http.ResponseWriter,
-	request *http.Request) {
-	var override struct {
-		Key          string `json:"key"`
-		Override     bool   `json:"override"`
-		Confirmation string `json:"confirmation"`
+// handleAllowKept turns "Allow deleting against AI recommendation" on or off (D-078).
+func (server *Server) handleAllowKept(writer http.ResponseWriter, request *http.Request) {
+	var allow struct {
+		Allow bool `json:"allow"`
 	}
-	if err := decodeJSON(request, &override); err != nil {
+	if err := decodeJSON(request, &allow); err != nil {
 		writeJSONError(writer, http.StatusBadRequest, "invalid request: "+err.Error())
 		return
 	}
-	view, err := server.manager.OverrideKeep(override.Key, override.Override,
-		override.Confirmation)
+	view, err := server.manager.SetAllowKept(allow.Allow)
 	if err != nil {
 		writeResultsError(writer, err)
 		return

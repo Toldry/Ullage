@@ -316,7 +316,7 @@ export interface ResultCategory {
   cloudSyncItems: number;
   notLocalBytes: number;
   selectable: boolean;
-  // An AI "keep" category the user chose to delete anyway (D-078).
+  // An AI "keep" category made selectable by "Allow deleting against AI recommendation".
   keepOverridden?: boolean;
   tooRecentItems?: number;
   tooRecentBytes?: number;
@@ -338,6 +338,8 @@ export interface ResultsView {
   batchesImported: number;
   unchangedDays: number;
   minimumItemBytes: number;
+  // "Allow deleting against AI recommendation" is on (D-078).
+  allowKept: boolean;
 }
 
 // Deletion (internal/session/deletion.go, internal/deletion)
@@ -360,7 +362,7 @@ export interface DeletionItem {
   warning?: string;
   // Read again by a re-scan; bytes is then its size at the re-scan.
   rescanned?: boolean;
-  // The AI suggested keeping it; the user chose "Delete anyway" (D-078).
+  // The AI suggested keeping it; the user allowed deleting it anyway (D-078).
   keepOverridden?: boolean;
 }
 

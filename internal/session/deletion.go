@@ -74,7 +74,7 @@ type DeletionItem struct {
 	// Rescanned: the item was read again and is checked against that state, not the
 	// scan's; Bytes is then its size at the re-scan.
 	Rescanned bool `json:"rescanned,omitempty"`
-	// KeepOverridden: the AI suggested keeping it and the user chose to delete it anyway.
+	// KeepOverridden: the AI suggested keeping it; the user allowed deleting it anyway.
 	KeepOverridden bool `json:"keepOverridden,omitempty"`
 }
 
@@ -202,7 +202,7 @@ func refusalReason(category results.Category) string {
 	case !category.BruteForce.Allowed && category.Source == results.SourceRecipe:
 		return "this recipe offers managed cleanup only: " + category.BruteForce.Reason
 	case !category.BruteForce.Allowed:
-		return "the AI suggests keeping these; choose \"Delete anyway\" on its row first"
+		return "the AI suggests keeping these; turn on \"Allow deleting against AI recommendation\" first"
 	case category.NeedsExplanation:
 		return "the AI reply did not explain this category"
 	case category.NeedsExpand:

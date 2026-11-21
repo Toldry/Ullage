@@ -83,27 +83,27 @@ describe('result selection', () => {
   });
 });
 
-describe('delete anyway (D-078)', () => {
+describe('allow deleting against AI recommendation (D-078)', () => {
   const view = (kept: ResultCategory[]) => ({ categories: [category('ai:1')], kept }) as
     unknown as ResultsView;
 
-  it('only offers overridden keep categories for selection', () => {
+  it('only offers keep categories for selection while allowed', () => {
     const kept = category('ai:2', { selectable: false, bruteForce: { allowed: false } });
     expect(selectionCategories(view([kept])).map((entry) => entry.key)).toEqual(['ai:1']);
-    const overridden = { ...kept, selectable: true, keepOverridden: true };
-    expect(selectionCategories(view([overridden])).map((entry) => entry.key))
+    const allowed = { ...kept, selectable: true, keepOverridden: true };
+    expect(selectionCategories(view([allowed])).map((entry) => entry.key))
       .toEqual(['ai:1', 'ai:2']);
   });
 
-  it('drops a keep category from the selection once it is kept again', () => {
-    const overridden = category('ai:2', { keepOverridden: true });
-    const selection = toggleCategory(overridden, new Set());
-    const keptAgain = { ...overridden, keepOverridden: false, selectable: false };
-    expect(pruneSelection(selectionCategories(view([overridden])), selection).size).toBe(2);
+  it('drops keep categories from the selection once it is turned off', () => {
+    const allowed = category('ai:2', { keepOverridden: true });
+    const selection = toggleCategory(allowed, new Set());
+    const keptAgain = { ...allowed, keepOverridden: false, selectable: false };
+    expect(pruneSelection(selectionCategories(view([allowed])), selection).size).toBe(2);
     expect(pruneSelection(selectionCategories(view([keptAgain])), selection).size).toBe(0);
   });
 
-  it('lets select all skip keep categories unless overridden', () => {
+  it('lets select all skip keep categories unless allowed', () => {
     const kept = category('ai:2', { selectable: false });
     expect(selectAll([category('ai:1'), kept], new Set()).has('ai:2|id:1')).toBe(false);
   });
